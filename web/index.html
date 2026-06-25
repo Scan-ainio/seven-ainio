@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Takken AI Coach</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">MVP Dashboard</p>
+        <h1>Takken AI Coach</h1>
+        <p class="subtitle">今天只完成一个闭环：学习、做题、记录错题、决定明天。</p>
+      </header>
+
+      <section class="status-grid" aria-label="今日状态">
+        <article class="stat-card">
+          <span>距离考试</span>
+          <strong>约90天</strong>
+        </article>
+        <article class="stat-card">
+          <span>当前阶段</span>
+          <strong>基础建立期</strong>
+        </article>
+        <article class="stat-card">
+          <span>连续学习</span>
+          <strong>1天</strong>
+        </article>
+        <article class="stat-card">
+          <span>今日学习时间</span>
+          <strong>75分钟</strong>
+        </article>
+      </section>
+
+      <section class="card today-task">
+        <div class="section-heading">
+          <p class="eyebrow">Today's Focus</p>
+          <h2>今日任务</h2>
+        </div>
+        <div class="focus-line">
+          <span>宅建業法</span>
+          <strong>免許制度</strong>
+        </div>
+        <ul class="task-list">
+          <li>学习 30 分钟</li>
+          <li>做题 10-15 道</li>
+          <li>记录 1-3 道错题</li>
+        </ul>
+      </section>
+
+      <section class="card advice">
+        <div class="section-heading">
+          <p class="eyebrow">AI Coach</p>
+          <h2>AI 今日建议</h2>
+        </div>
+        <p>今天不要贪多，只拿下“免許制度”。</p>
+        <p>宅建業法是短期提分最高的科目，免許制度是入口主题。</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <p class="eyebrow">Progress</p>
+          <h2>四大科目掌握度</h2>
+        </div>
+        <div class="progress-list">
+          <div class="progress-row">
+            <div>
+              <span>宅建業法</span>
+              <strong>10%</strong>
+            </div>
+            <div class="bar"><span style="width: 10%"></span></div>
+          </div>
+          <div class="progress-row">
+            <div>
+              <span>権利関係</span>
+              <strong>0%</strong>
+            </div>
+            <div class="bar"><span style="width: 0%"></span></div>
+          </div>
+          <div class="progress-row">
+            <div>
+              <span>法令上の制限</span>
+              <strong>0%</strong>
+            </div>
+            <div class="bar"><span style="width: 0%"></span></div>
+          </div>
+          <div class="progress-row">
+            <div>
+              <span>税・その他</span>
+              <strong>0%</strong>
+            </div>
+            <div class="bar"><span style="width: 0%"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card review-card">
+        <div class="section-heading">
+          <p class="eyebrow">Review</p>
+          <h2>今日复盘</h2>
+        </div>
+        <form>
+          <label>
+            学习时间
+            <input type="number" inputmode="numeric" min="0" placeholder="例如 75">
+          </label>
+          <label>
+            做题数量
+            <input id="totalQuestions" type="number" inputmode="numeric" min="0" placeholder="例如 15">
+          </label>
+          <label>
+            正确题数
+            <input id="correctQuestions" type="number" inputmode="numeric" min="0" placeholder="例如 10">
+          </label>
+          <label>
+            错题原因
+            <textarea rows="3" placeholder="例如：大臣免許和知事免許的判断标准混淆"></textarea>
+          </label>
+        </form>
+        <div class="score-box" id="scoreBox">填写做题数量和正确题数后，这里会显示今日判断。</div>
+      </section>
+
+      <section class="card tomorrow">
+        <div class="section-heading">
+          <p class="eyebrow">Next</p>
+          <h2>明日计划预告</h2>
+        </div>
+        <p>如果正确率 70% 以上，进入“宅建士制度”。</p>
+        <p>如果低于 70%，继续补“免許制度”。</p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
