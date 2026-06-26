@@ -280,6 +280,8 @@ function createLessonNote(lessonId, knowledgeId) {
 }
 
 function getChapterLabel(lessonId, index) {
+  const lesson = window.xiaoWuCourseEngine?.getLesson(lessonId);
+  if (lesson?.chapterLabels?.[index]) return lesson.chapterLabels[index];
   return lessonChapterLabels[lessonId]?.[index] || `第${index + 1}章｜小吴课堂`;
 }
 
@@ -462,13 +464,13 @@ function renderLesson() {
 
   const progress = window.xiaoWuCourseEngine.getLessonProgress(lesson.lessonId);
   const story = lesson.story || [];
-  const pauseModules = lessonPauseModules[lesson.lessonId] || [];
+  const pauseModules = lesson.pauseModules || lessonPauseModules[lesson.lessonId] || [];
   currentLessonId = lesson.lessonId;
   loadCompletedCheckpoints(lesson.lessonId);
   const savedProgress = getReadingProgressValue(lesson.lessonId);
   const savedScrollY = getSavedScrollY(lesson.lessonId);
   const lessonLabel = lesson.lessonId.replace("lesson-", "Lesson");
-  const cleanTitle = lesson.title.replace(" 入门复习", "").replace("・保証協会入门复习", "・保証協会");
+  const cleanTitle = lesson.intro?.subtitle || lesson.title.replace(" 入门复习", "").replace("・保証協会入门复习", "・保証協会");
 
   lessonPageTitle.textContent = lessonLabel;
   lessonPageSubtitle.textContent = cleanTitle;
