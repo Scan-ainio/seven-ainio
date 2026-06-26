@@ -406,6 +406,25 @@ h2 {
   margin-top: 12px;
 }
 
+.back-link,
+.link-button {
+  display: inline-grid;
+  place-items: center;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.back-link {
+  width: fit-content;
+  margin-top: 14px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 999px;
+  color: #ffffff;
+  font-weight: 900;
+}
+
 .course-list {
   display: grid;
   gap: 8px;

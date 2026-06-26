@@ -278,6 +278,7 @@ function renderBrainPlan() {
 }
 
 function renderList(container, items) {
+  if (!container) return;
   container.innerHTML = "";
   items.forEach((text) => {
     const item = document.createElement("li");
@@ -552,15 +553,20 @@ function renderCourse(courseDashboard) {
   if (!lesson || !progress) return;
 
   currentCourseLessonId = lesson.lessonId;
+  if (courseLessonLabel) courseLessonLabel.textContent = lesson.intro?.label || lesson.lessonId.replace("lesson-", "Lesson");
+  if (courseTitle) courseTitle.textContent = lesson.title;
+  if (courseMeta) courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes || 35}分钟 / 视频课体系`;
+  if (courseProgressBadge) courseProgressBadge.textContent = `${progress.percent}%`;
+  if (courseProgressBar) courseProgressBar.style.width = `${progress.percent}%`;
+  if (courseStartButton) courseStartButton.textContent = `进入 ${lesson.lessonId.replace("lesson-", "Lesson")} 小吴课堂`;
+  if (courseCompleteButton) {
+    courseCompleteButton.textContent = progress.isCompleted ? "这一课已完成 🌿" : "完成这一课 🌿";
+    courseCompleteButton.disabled = progress.isCompleted;
+  }
+
+  if (!courseStory) return;
+
   renderCourseList(courseDashboard.courseCards || [], lesson.lessonId);
-  courseLessonLabel.textContent = lesson.intro?.label || lesson.lessonId;
-  courseTitle.textContent = lesson.title;
-  courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes}分钟 / 重要程度 ${lesson.importance}`;
-  courseProgressBadge.textContent = `${progress.percent}%`;
-  courseProgressBar.style.width = `${progress.percent}%`;
-  courseStartButton.textContent = progress.startedAt ? "继续学习" : "开始学习";
-  courseCompleteButton.textContent = progress.isCompleted ? "这一课已完成 🌿" : "完成这一课 🌿";
-  courseCompleteButton.disabled = progress.isCompleted;
   renderReadingProgress(lesson.lessonId);
   currentMemoryCardIndex = 0;
 
@@ -611,6 +617,7 @@ function renderCourse(courseDashboard) {
 }
 
 function renderCourseList(cards, activeLessonId) {
+  if (!courseList) return;
   courseList.innerHTML = "";
   cards.forEach((card) => {
     const button = document.createElement("button");
@@ -700,6 +707,10 @@ function startCourseLesson() {
   if (!currentCourseLessonId) return;
   startStudyTimer();
   window.xiaoWuCourseEngine.startLesson(currentCourseLessonId);
+  if (!courseStory) {
+    window.location.href = `course.html?id=${encodeURIComponent(currentCourseLessonId)}`;
+    return;
+  }
   renderBrainPlan();
 }
 
@@ -1213,17 +1224,21 @@ startStudyButton.addEventListener("click", startStudyTimer);
 completeTodayButton.addEventListener("click", completeTodayPlan);
 courseStartButton.addEventListener("click", startCourseLesson);
 courseCompleteButton.addEventListener("click", completeCourseLesson);
-lessonFinishButton.addEventListener("click", completeCourseLesson);
-courseOriginalPracticeButton.addEventListener("click", () => {
-  setQuestionSource("original");
-  startQuiz();
-  quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-courseOfficialPracticeButton.addEventListener("click", () => {
-  setQuestionSource("past");
-  startQuiz();
-  quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
-});
+if (lessonFinishButton) lessonFinishButton.addEventListener("click", completeCourseLesson);
+if (courseOriginalPracticeButton) {
+  courseOriginalPracticeButton.addEventListener("click", () => {
+    setQuestionSource("original");
+    startQuiz();
+    quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+if (courseOfficialPracticeButton) {
+  courseOfficialPracticeButton.addEventListener("click", () => {
+    setQuestionSource("past");
+    startQuiz();
+    quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
 originalSourceButton.addEventListener("click", () => {
   setQuestionSource("original");
 });

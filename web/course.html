@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>小吴课堂 - Takken Scan Coach</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="app-shell lesson-page-shell">
+      <header class="hero lesson-hero">
+        <p class="eyebrow">XiaoWu Video Lesson</p>
+        <h1>小吴课堂</h1>
+        <p class="subtitle">一节课只认真学一个视频。小7慢慢看，小吴陪你把重点留下来。</p>
+        <a class="back-link" href="index.html">← 回到学习驾驶舱</a>
+      </header>
+
+      <section class="card course-card" id="courseCard">
+        <div class="section-heading">
+          <p class="eyebrow">Video Lesson</p>
+          <h2>📚 小吴视频课</h2>
+        </div>
+
+        <div class="course-cover">
+          <div>
+            <span id="courseLessonLabel">Lesson001</span>
+            <strong id="courseTitle">课程加载中</strong>
+            <p id="courseMeta">小吴正在准备课堂...</p>
+          </div>
+          <div class="course-progress-badge" id="courseProgressBadge">0%</div>
+        </div>
+
+        <div class="reading-progress-card">
+          <div>
+            <span id="readingLessonLabel">📖 Lesson001</span>
+            <strong>阅读进度</strong>
+          </div>
+          <div class="reading-progress-track" id="readingProgressTrack" aria-label="阅读进度"></div>
+          <p id="readingProgressText">0%</p>
+        </div>
+
+        <div class="course-progress">
+          <span id="courseProgressBar"></span>
+        </div>
+
+        <div class="course-actions">
+          <button class="primary-button" id="courseStartButton" type="button">开始本课学习</button>
+          <button class="secondary-button" id="courseCompleteButton" type="button">完成这一课 🌿</button>
+        </div>
+
+        <div class="course-lesson" id="courseLesson">
+          <div class="course-story">
+            <span>🌸 小吴开场</span>
+            <div id="courseStory"></div>
+          </div>
+
+          <div class="course-panel">
+            <span>❤️ 为什么这一课重要？</span>
+            <p id="courseImportance"></p>
+          </div>
+
+          <div class="lesson-grid">
+            <article>
+              <h3>⭐ 本课重点</h3>
+              <ul id="courseExamPoints"></ul>
+            </article>
+            <article>
+              <h3>⚠️ 最容易错</h3>
+              <ul id="courseCommonMistakes"></ul>
+            </article>
+          </div>
+
+          <div class="course-panel">
+            <span>👨‍🏫 小吴这样理解</span>
+            <p id="courseMemoryTip"></p>
+          </div>
+
+          <div class="course-panel">
+            <span>🧠 一张记忆卡</span>
+            <div class="memory-card-list" id="courseMemoryCard"></div>
+          </div>
+
+          <div class="course-sentence">
+            <span>🌸 今天只记一句话</span>
+            <strong id="courseTodaySentence"></strong>
+          </div>
+
+          <div class="course-panel">
+            <span>🎯 为什么考试喜欢这样出题？</span>
+            <div id="courseExamTrap"></div>
+          </div>
+
+          <div class="course-keywords" id="courseKeywords"></div>
+
+          <div class="course-practice">
+            <span>📝 学完以后做什么？</span>
+            <p id="coursePracticeText"></p>
+            <div class="course-actions">
+              <a class="secondary-button link-button" href="index.html#quizCard">回首页做原创题</a>
+              <a class="secondary-button link-button" href="index.html#quizCard">回首页做官方过去问</a>
+            </div>
+          </div>
+
+          <div class="course-summary">
+            <span>❤️ 小吴今天的小结</span>
+            <p id="courseSummary"></p>
+          </div>
+
+          <div class="lesson-finish-panel hidden" id="lessonFinishPanel">
+            <span>🎉 Lesson001 完成！</span>
+            <p id="lessonFinishStats"></p>
+            <button class="primary-button" id="lessonFinishButton" type="button">完成今天学习 🌸</button>
+          </div>
+
+          <p class="course-reward" id="courseReward"></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="course/course-index.js"></script>
+    <script src="course/course-engine.js"></script>
+    <script src="course-page.js"></script>
+  </body>
+</html>
