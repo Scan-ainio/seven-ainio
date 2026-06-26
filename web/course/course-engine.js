@@ -2,6 +2,7 @@ window.xiaoWuCourseEngine = (() => {
   const keys = {
     progress: "takken_course_progress_v1",
     answerHistory: "takken_answer_history_v1",
+    selectedLesson: "takken_selected_lesson_v1",
     treeGrowth: "takken_tree_growth_v1",
     treeHistory: "takken_tree_history_v1"
   };
@@ -113,9 +114,17 @@ window.xiaoWuCourseEngine = (() => {
   }
 
   function getActiveLessonId(answers) {
+    const selectedLessonId = localStorage.getItem(keys.selectedLesson);
+    if (selectedLessonId && getLesson(selectedLessonId)) return selectedLessonId;
+
     const cards = getCourseCards(answers);
     const firstOpen = cards.find((card) => card.status !== "locked" && !card.progress.isCompleted);
     return firstOpen?.lessonId || cards[0]?.lessonId || "";
+  }
+
+  function selectLesson(lessonId) {
+    localStorage.setItem(keys.selectedLesson, lessonId);
+    notifyCourseReady();
   }
 
   function startLesson(lessonId) {
@@ -207,6 +216,7 @@ window.xiaoWuCourseEngine = (() => {
     getLessonAccuracy,
     getTopicStatus,
     buildDashboard,
+    selectLesson,
     startLesson,
     completeLesson
   };

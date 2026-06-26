@@ -164,37 +164,54 @@
           <button class="secondary-button" id="courseCompleteButton" type="button">完成这一课 🌿</button>
         </div>
 
+        <div class="course-list" id="courseList" aria-label="课程目录"></div>
+
         <div class="course-lesson" id="courseLesson">
           <div class="course-story">
-            <span>小吴开场</span>
+            <span>🌸 小吴开场</span>
             <div id="courseStory"></div>
+          </div>
+
+          <div class="course-panel">
+            <span>❤️ 为什么这一课重要？</span>
+            <p id="courseImportance"></p>
           </div>
 
           <div class="lesson-grid">
             <article>
-              <h3>本课重点</h3>
+              <h3>⭐ 本课重点</h3>
               <ul id="courseExamPoints"></ul>
             </article>
             <article>
-              <h3>最容易错</h3>
+              <h3>⚠️ 最容易错</h3>
               <ul id="courseCommonMistakes"></ul>
             </article>
           </div>
 
-          <div class="lesson-tip">
-            <span>小吴记忆法</span>
+          <div class="course-panel">
+            <span>👨‍🏫 小吴这样理解</span>
             <p id="courseMemoryTip"></p>
           </div>
 
+          <div class="course-panel">
+            <span>🧠 一张记忆卡</span>
+            <div class="memory-card-list" id="courseMemoryCard"></div>
+          </div>
+
           <div class="course-sentence">
-            <span>今天一句话</span>
+            <span>🌸 今天只记一句话</span>
             <strong id="courseTodaySentence"></strong>
+          </div>
+
+          <div class="course-panel">
+            <span>🎯 为什么考试喜欢这样出题？</span>
+            <p id="courseExamTrap"></p>
           </div>
 
           <div class="course-keywords" id="courseKeywords"></div>
 
           <div class="course-practice">
-            <span>今日练习</span>
+            <span>📝 学完以后做什么？</span>
             <p id="coursePracticeText"></p>
             <div class="course-actions">
               <button class="secondary-button" id="courseOriginalPracticeButton" type="button">原创题练习</button>
@@ -203,7 +220,7 @@
           </div>
 
           <div class="course-summary">
-            <span>小吴总结</span>
+            <span>❤️ 小吴今天的小结</span>
             <p id="courseSummary"></p>
           </div>
 

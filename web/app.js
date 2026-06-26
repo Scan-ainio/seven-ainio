@@ -43,11 +43,15 @@ const courseProgressBadge = document.querySelector("#courseProgressBadge");
 const courseProgressBar = document.querySelector("#courseProgressBar");
 const courseStartButton = document.querySelector("#courseStartButton");
 const courseCompleteButton = document.querySelector("#courseCompleteButton");
+const courseList = document.querySelector("#courseList");
 const courseStory = document.querySelector("#courseStory");
+const courseImportance = document.querySelector("#courseImportance");
 const courseExamPoints = document.querySelector("#courseExamPoints");
 const courseCommonMistakes = document.querySelector("#courseCommonMistakes");
 const courseMemoryTip = document.querySelector("#courseMemoryTip");
+const courseMemoryCard = document.querySelector("#courseMemoryCard");
 const courseTodaySentence = document.querySelector("#courseTodaySentence");
+const courseExamTrap = document.querySelector("#courseExamTrap");
 const courseKeywords = document.querySelector("#courseKeywords");
 const coursePracticeText = document.querySelector("#coursePracticeText");
 const courseOriginalPracticeButton = document.querySelector("#courseOriginalPracticeButton");
@@ -247,6 +251,7 @@ function renderCourse(courseDashboard) {
   if (!lesson || !progress) return;
 
   currentCourseLessonId = lesson.lessonId;
+  renderCourseList(courseDashboard.courseCards || [], lesson.lessonId);
   courseLessonLabel.textContent = lesson.intro?.label || lesson.lessonId;
   courseTitle.textContent = lesson.title;
   courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes}分钟 / 重要程度 ${lesson.importance}`;
@@ -263,19 +268,44 @@ function renderCourse(courseDashboard) {
     courseStory.appendChild(text);
   });
 
+  courseImportance.textContent = lesson.whyImportant || lesson.importanceReason?.body || "";
   renderList(courseExamPoints, lesson.examPoints.slice(0, 5));
   renderList(courseCommonMistakes, lesson.commonMistakes.slice(0, 3));
-  courseMemoryTip.textContent = lesson.memoryTip;
+  courseMemoryTip.textContent = lesson.understanding || lesson.memoryTip;
+  courseMemoryCard.innerHTML = "";
+  (lesson.memoryCard || []).forEach((card) => {
+    const row = document.createElement("div");
+    row.className = "memory-card-row";
+    row.innerHTML = `<strong>${card.front}</strong><span>↓</span><em>${card.back}</em>`;
+    courseMemoryCard.appendChild(row);
+  });
   courseTodaySentence.textContent = lesson.todaySentence;
+  courseExamTrap.textContent = lesson.examTrap || "";
   courseKeywords.innerHTML = "";
   lesson.keywords.forEach((keyword) => {
     const item = document.createElement("span");
     item.textContent = keyword;
     courseKeywords.appendChild(item);
   });
-  coursePracticeText.textContent = `原创题 ${lesson.practiceQuestionIds.length} 道 / 官方过去问 ${lesson.officialQuestionIds.length} 道。先理解，再做题，小吴陪小7把这一课真正落下来。`;
+  coursePracticeText.textContent = lesson.afterLesson || `原创题 ${lesson.practiceQuestionIds.length} 道 / 官方过去问 ${lesson.officialQuestionIds.length} 道。先理解，再做题，小吴陪小7把这一课真正落下来。`;
   courseSummary.textContent = lesson.summary;
   courseReward.textContent = `${lesson.completionReward.treeIcon} 完成奖励：成长值 +${lesson.completionReward.growthValue}。${lesson.completionReward.message}`;
+}
+
+function renderCourseList(cards, activeLessonId) {
+  courseList.innerHTML = "";
+  cards.forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `course-list-item${card.lessonId === activeLessonId ? " active" : ""}${card.progress.isCompleted ? " completed" : ""}`;
+    button.innerHTML = `<span>${String(card.order).padStart(2, "0")}</span><strong>${card.title}</strong><em>${card.subject}</em>`;
+    button.addEventListener("click", () => {
+      window.xiaoWuCourseEngine.selectLesson(card.lessonId);
+      renderBrainPlan();
+      document.querySelector("#courseCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    courseList.appendChild(button);
+  });
 }
 
 function renderLearningMap(sections) {

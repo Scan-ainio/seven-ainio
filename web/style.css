@@ -305,7 +305,8 @@ h2 {
 .course-cover span,
 .course-story span,
 .course-practice span,
-.course-summary span {
+.course-summary span,
+.course-panel span {
   display: block;
   color: #6f6043;
   font-size: 0.84rem;
@@ -358,6 +359,54 @@ h2 {
   margin-top: 12px;
 }
 
+.course-list {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  margin-top: 12px;
+  overflow: auto;
+  padding: 8px;
+  background: #fbfcfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.course-list-item {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.course-list-item span,
+.course-list-item em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.course-list-item strong {
+  font-size: 0.92rem;
+}
+
+.course-list-item.active {
+  background: #edf8f2;
+  border-color: #b9dfc8;
+}
+
+.course-list-item.completed strong {
+  color: var(--accent-dark);
+}
+
 .course-lesson {
   margin-top: 14px;
 }
@@ -366,6 +415,7 @@ h2 {
 .course-practice,
 .course-summary,
 .course-sentence,
+.course-panel,
 .course-reward {
   padding: 12px;
   background: #ffffff;
@@ -382,8 +432,18 @@ h2 {
 .course-story p:last-child,
 .course-practice p,
 .course-summary p,
+.course-panel p,
 .course-reward {
   margin-bottom: 0;
+}
+
+.course-panel {
+  margin-top: 12px;
+}
+
+.course-panel p {
+  color: #4f4738;
+  font-weight: 720;
 }
 
 .course-sentence {
@@ -420,6 +480,34 @@ h2 {
   color: #7d4557;
   font-size: 0.86rem;
   font-weight: 850;
+}
+
+.memory-card-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memory-card-row {
+  display: grid;
+  grid-template-columns: 1fr 28px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background: #fbf7ed;
+  border: 1px solid #eadfc7;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.memory-card-row strong,
+.memory-card-row em {
+  font-style: normal;
+  font-weight: 900;
+}
+
+.memory-card-row span {
+  color: var(--accent-dark);
 }
 
 .course-practice,
