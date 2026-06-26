@@ -11,6 +11,7 @@
       <header class="hero">
         <p class="eyebrow">MVP Dashboard</p>
         <h1>Takken Scan Coach</h1>
+        <p class="companion-message" id="companionMessage">小7，今天 Scan 教导员陪你学习。</p>
         <p class="subtitle">今天只完成一个闭环：学习、做题、记录错题、决定明天。</p>
       </header>
 
@@ -129,8 +130,124 @@
         <p>如果正确率 70% 以上，进入“宅建士制度”。</p>
         <p>如果低于 70%，继续补“免許制度”。</p>
       </section>
+
+      <section class="card quiz-card" id="quizCard">
+        <div class="section-heading">
+          <p class="eyebrow">Practice</p>
+          <h2>小7陪学做题</h2>
+        </div>
+
+        <div id="quizIntro" class="quiz-intro">
+          <p>今天先做「宅建業法 - 免許制度」10 道原创练习题。</p>
+          <p>每题答完马上看讲解，Scan 教导员会陪小7把考点拆开。</p>
+          <div class="source-picker" role="group" aria-label="选择题库来源">
+            <button class="source-button active" id="originalSourceButton" type="button">原创练习题</button>
+            <button class="source-button" id="pastSourceButton" type="button">📚 官方过去问</button>
+          </div>
+          <p class="source-help" id="sourceHelp">当前：原创题库。适合先练免許制度基础。</p>
+          <button class="primary-button" id="startQuizButton" type="button">开始做题</button>
+        </div>
+
+        <div id="quizPanel" class="quiz-panel hidden">
+          <div class="quiz-meta">
+            <span id="questionCounter">第 1 / 10 题</span>
+            <span id="questionTopic">宅建業法 - 免許制度</span>
+            <span id="questionSource">原创题</span>
+            <span id="lawBadge" class="law-badge hidden">current</span>
+          </div>
+          <div class="law-alert hidden" id="lawAlert"></div>
+
+          <h3 id="questionText"></h3>
+          <p class="official-note hidden" id="officialNote"></p>
+          <a class="official-link hidden" id="officialLink" href="#" target="_blank" rel="noopener">查看 RETIO 官方PDF 来源</a>
+          <div class="options-grid" id="optionsGrid"></div>
+
+          <button class="primary-button" id="submitAnswerButton" type="button" disabled>提交答案</button>
+
+          <article class="explanation-note hidden" id="explanationBox">
+            <p class="result-label" id="resultLabel"></p>
+            <h3>👨‍🏫 Scan教导员正在给小7讲解</h3>
+            <p class="coach-line" id="coachLine"></p>
+            <p><strong>正确答案：</strong><span id="correctAnswerText"></span></p>
+            <p><strong>正确理由：</strong><span id="correctReasonText"></span></p>
+            <div>
+              <strong>为什么其他选项错：</strong>
+              <ul id="wrongReasonsList"></ul>
+            </div>
+            <p><strong>考试重点：</strong><span id="examPointText"></span></p>
+            <p><strong>记忆口诀：</strong><span id="memoryTipText"></span></p>
+            <div class="scan-reminder">
+              <p>━━━━━━━━━━━━</p>
+              <p>🌸 Scan教导员的小提醒：<br>今天不用一次记住全部。<br>只要记住这一题，下次遇见就会轻松很多。</p>
+              <p>━━━━━━━━━━━━</p>
+            </div>
+            <button class="secondary-button" id="nextQuestionButton" type="button">下一题</button>
+          </article>
+        </div>
+
+        <div id="quizSummary" class="quiz-summary hidden">
+          <p class="eyebrow">Result</p>
+          <h2>今日做题完成</h2>
+          <div class="summary-score">
+            <strong id="finalScore">0 / 10</strong>
+            <span id="finalRate">正确率 0%</span>
+          </div>
+          <p id="todayAdvice"></p>
+          <p class="soft-summary">今天辛苦了，小7 ❤️<br>无论今天做对多少题，只要坚持学习，就是在向合格前进。<br>Scan 教导员已经帮你记录今天的努力。<br>明天继续一起加油。</p>
+          <button class="secondary-button" id="restartQuizButton" type="button">再做一遍</button>
+        </div>
+      </section>
+
+      <section class="card mistakes-card" id="mistakesCard">
+        <div class="section-heading">
+          <p class="eyebrow">Mistakes</p>
+          <h2>🌸 小7错题回顾</h2>
+        </div>
+
+        <p class="mistake-note">小7，这里不是失败记录。<br>这里是我们一点一点变强的证据。</p>
+
+        <button class="secondary-button" id="toggleMistakesButton" type="button">打开错题回顾</button>
+
+        <div class="mistakes-panel hidden" id="mistakesPanel">
+          <div class="mistake-stats" aria-label="错题统计">
+            <article>
+              <span>累计做题数</span>
+              <strong id="totalAnsweredStat">0</strong>
+            </article>
+            <article>
+              <span>累计错题数</span>
+              <strong id="totalMistakesStat">0</strong>
+            </article>
+            <article>
+              <span>待复习</span>
+              <strong id="reviewMistakesStat">0</strong>
+            </article>
+            <article>
+              <span>已掌握</span>
+              <strong id="masteredMistakesStat">0</strong>
+            </article>
+          </div>
+
+          <div class="empty-mistakes hidden" id="emptyMistakes">
+            现在还没有错题记录。<br>
+            今天先做几题，Scan教导员会帮小7把容易错的地方记下来。
+          </div>
+
+          <div class="mistake-section" id="reviewMistakesSection">
+            <h3>还要复习</h3>
+            <div class="mistake-list" id="reviewMistakesList"></div>
+          </div>
+
+          <div class="mistake-section" id="masteredMistakesSection">
+            <h3>已掌握</h3>
+            <div class="mistake-list" id="masteredMistakesList"></div>
+          </div>
+        </div>
+      </section>
     </main>
 
+    <script src="questions.js"></script>
+    <script src="pastQuestions.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
