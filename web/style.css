@@ -353,6 +353,53 @@ h2 {
   border-radius: inherit;
 }
 
+.reading-progress-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f7fbf2;
+  border: 1px solid #d6e7c9;
+  border-radius: 8px;
+}
+
+.reading-progress-card div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.reading-progress-card span,
+.reading-progress-card strong {
+  color: var(--accent-dark);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.reading-progress-card p {
+  margin: 0;
+  color: #59704f;
+  font-weight: 900;
+  text-align: right;
+}
+
+.reading-progress-track {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.reading-progress-track span {
+  height: 10px;
+  background: #e2eadb;
+  border-radius: 999px;
+}
+
+.reading-progress-track span.filled {
+  background: #70a96f;
+}
+
 .course-actions {
   display: grid;
   gap: 10px;
@@ -423,7 +470,8 @@ h2 {
   border-radius: 8px;
 }
 
-.course-story p {
+.course-story p,
+.knowledge-point p {
   margin-bottom: 8px;
   color: #4f4738;
   font-weight: 720;
@@ -444,6 +492,149 @@ h2 {
 .course-panel p {
   color: #4f4738;
   font-weight: 720;
+}
+
+.knowledge-point {
+  margin-bottom: 10px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e5dcc8;
+  border-radius: 8px;
+}
+
+.knowledge-point-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.knowledge-point-header span {
+  color: #6f6043;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.favorite-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  background: #fff9ef;
+  border: 1px solid #eadfc7;
+  border-radius: 999px;
+  color: #7a6040;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.favorite-button.active {
+  background: #fff3c8;
+  border-color: #e5c667;
+  color: #73520f;
+}
+
+.lesson-note {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lesson-note span {
+  color: #6f6043;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.lesson-note textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  padding: 10px;
+  background: #fffdf7;
+  border: 1px solid #eadfc7;
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+}
+
+.lesson-pause-card,
+.lesson-mood-card,
+.chapter-checkpoint,
+.lesson-finish-panel {
+  margin: 12px 0;
+  padding: 13px;
+  background: #fff8fb;
+  border: 1px solid #f1cedc;
+  border-radius: 8px;
+}
+
+.lesson-pause-card h3 {
+  margin-bottom: 8px;
+  color: #7d4557;
+  font-size: 1rem;
+}
+
+.lesson-pause-card p,
+.lesson-mood-card,
+.chapter-checkpoint p,
+.lesson-finish-panel p {
+  color: #4f4738;
+  font-weight: 740;
+}
+
+.lesson-collapsible {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px dashed #e7bdce;
+  border-radius: 8px;
+}
+
+.lesson-collapsible strong {
+  color: #7d4557;
+  font-size: 0.9rem;
+}
+
+.lesson-collapsible button {
+  min-height: 42px;
+  background: #7fb27c;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 900;
+}
+
+.lesson-collapsible-body {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-collapsible-body p {
+  margin: 0;
+  color: #4f4738;
+  font-weight: 740;
+}
+
+.lesson-mood-card {
+  background: #f6fbf1;
+  border-color: #d6e7c9;
+  color: #4e6c45;
+}
+
+.chapter-checkpoint {
+  display: grid;
+  gap: 10px;
+  background: #f7fbf2;
+  border-color: #d6e7c9;
+}
+
+.chapter-checkpoint span {
+  font-size: 1.4rem;
 }
 
 .course-sentence {
@@ -488,22 +679,60 @@ h2 {
   margin-top: 10px;
 }
 
-.memory-card-row {
+.memory-carousel {
   display: grid;
-  grid-template-columns: 1fr 28px 1fr;
+  gap: 10px;
+}
+
+.memory-card-slide {
+  display: grid;
   gap: 8px;
-  align-items: center;
-  padding: 10px;
+  min-height: 190px;
+  align-content: center;
+  padding: 16px;
   background: #fbf7ed;
   border: 1px solid #eadfc7;
   border-radius: 8px;
   text-align: center;
 }
 
-.memory-card-row strong,
-.memory-card-row em {
+.memory-card-slide span,
+.memory-card-stats {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.memory-card-slide strong,
+.memory-card-slide em {
+  display: block;
   font-style: normal;
   font-weight: 900;
+}
+
+.memory-card-slide strong {
+  font-size: 1.3rem;
+}
+
+.memory-card-slide em {
+  color: var(--accent-dark);
+  font-size: 1.1rem;
+}
+
+.memory-card-slide p {
+  margin: 0;
+  color: #6f6043;
+  font-weight: 760;
+}
+
+.memory-card-controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.memory-card-controls button {
+  min-height: 44px;
 }
 
 .memory-card-row span {
@@ -521,6 +750,20 @@ h2 {
 .course-reward {
   color: #4f4738;
   font-weight: 740;
+}
+
+.lesson-finish-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  background: #f7fbf2;
+  border-color: #cfe4c4;
+}
+
+.lesson-finish-panel span {
+  color: var(--accent-dark);
+  font-size: 1.05rem;
+  font-weight: 950;
 }
 
 .lesson-focus {

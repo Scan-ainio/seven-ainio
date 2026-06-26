@@ -41,9 +41,13 @@ const courseTitle = document.querySelector("#courseTitle");
 const courseMeta = document.querySelector("#courseMeta");
 const courseProgressBadge = document.querySelector("#courseProgressBadge");
 const courseProgressBar = document.querySelector("#courseProgressBar");
+const readingLessonLabel = document.querySelector("#readingLessonLabel");
+const readingProgressTrack = document.querySelector("#readingProgressTrack");
+const readingProgressText = document.querySelector("#readingProgressText");
 const courseStartButton = document.querySelector("#courseStartButton");
 const courseCompleteButton = document.querySelector("#courseCompleteButton");
 const courseList = document.querySelector("#courseList");
+const courseLesson = document.querySelector("#courseLesson");
 const courseStory = document.querySelector("#courseStory");
 const courseImportance = document.querySelector("#courseImportance");
 const courseExamPoints = document.querySelector("#courseExamPoints");
@@ -58,6 +62,9 @@ const courseOriginalPracticeButton = document.querySelector("#courseOriginalPrac
 const courseOfficialPracticeButton = document.querySelector("#courseOfficialPracticeButton");
 const courseSummary = document.querySelector("#courseSummary");
 const courseReward = document.querySelector("#courseReward");
+const lessonFinishPanel = document.querySelector("#lessonFinishPanel");
+const lessonFinishStats = document.querySelector("#lessonFinishStats");
+const lessonFinishButton = document.querySelector("#lessonFinishButton");
 const startQuizButton = document.querySelector("#startQuizButton");
 const quizIntro = document.querySelector("#quizIntro");
 const quizPanel = document.querySelector("#quizPanel");
@@ -182,6 +189,41 @@ let lastStudyTick = null;
 let isStudyTiming = false;
 let currentBrainPlan = null;
 let currentCourseLessonId = "";
+let currentMemoryCardIndex = 0;
+
+const lessonPauseModules = {
+  "lesson-001": [
+    {
+      afterIndex: 2,
+      title: "🌸 小吴暂停一下～",
+      question: "如果以后我们在东京和埼玉各开一家事务所，应该申请：知事免許，还是国土交通大臣免許？",
+      answer: "应该申请国土交通大臣免許。",
+      explanation: "关键不是客户在哪里，也不是房子在哪里，而是事务所跨了两个以上都道府县。东京和埼玉各有事务所，就是跨地区，所以交给国土交通大臣。"
+    },
+    {
+      afterIndex: 8,
+      title: "☕ 小吴再问小7一个小问题",
+      question: "看到“50日前辞任”的役員，小7应该马上判断没事吗？",
+      answer: "不能。50日前辞任仍然可能属于公示日前60日以内。",
+      explanation: "这题不是单纯比数字，而是看时间范围。60日以内包含50日前，所以要先画时间线，再判断有没有被规则抓住。"
+    },
+    {
+      afterIndex: 13,
+      title: "🌿 小吴确认一下",
+      question: "営業保証金和保証協会的金额可以混着记吗？",
+      answer: "不可以。営業保証金是1000万/500万/0円，保証協会分担金是60万/30万。",
+      explanation: "考试很爱把两套制度放在同一题里。小7先分清“直接供託”还是“加入保証協会”，再套对应数字。"
+    }
+  ]
+};
+
+const lessonMoodLines = [
+  "🌸 今天不用全部背下来。理解比记忆更重要。",
+  "小7，现在觉得难，说明你正在成长。",
+  "慢一点没关系，小吴陪你把这一块真的看懂。",
+  "这一段如果有点绕，就先抓住主语和流程。",
+  "小7已经看到重点了，后面做题会越来越稳。"
+];
 
 function readStorage(key) {
   try {
@@ -244,6 +286,265 @@ function renderList(container, items) {
   });
 }
 
+function lessonStorageKey(lessonId, suffix) {
+  return `${lessonId}-${suffix}`;
+}
+
+function getLessonFavorites(lessonId) {
+  return readStorage(lessonStorageKey(lessonId, "favorites"));
+}
+
+function saveLessonFavorites(lessonId, favorites) {
+  writeStorage(lessonStorageKey(lessonId, "favorites"), favorites);
+}
+
+function getLessonMemoryState(lessonId) {
+  return readStorageObject(lessonStorageKey(lessonId, "memory-cards"));
+}
+
+function saveLessonMemoryState(lessonId, state) {
+  localStorage.setItem(lessonStorageKey(lessonId, "memory-cards"), JSON.stringify(state));
+}
+
+function createFavoriteButton(lessonId, knowledgeId) {
+  const favorites = getLessonFavorites(lessonId);
+  const isFavorite = favorites.includes(knowledgeId);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `favorite-button${isFavorite ? " active" : ""}`;
+  button.textContent = isFavorite ? "⭐ 已收藏" : "⭐ 收藏";
+  button.addEventListener("click", () => {
+    const current = getLessonFavorites(lessonId);
+    const next = current.includes(knowledgeId)
+      ? current.filter((item) => item !== knowledgeId)
+      : [...current, knowledgeId];
+    saveLessonFavorites(lessonId, next);
+    renderBrainPlan();
+  });
+  return button;
+}
+
+function createLessonNote(lessonId, knowledgeId) {
+  const wrap = document.createElement("label");
+  wrap.className = "lesson-note";
+  const storageKey = lessonStorageKey(lessonId, `note-${knowledgeId}`);
+  wrap.innerHTML = "<span>📝 我的小笔记</span>";
+
+  const textarea = document.createElement("textarea");
+  textarea.rows = 3;
+  textarea.placeholder = "小7可以写：这里哪里容易错、下次怎么判断。";
+  textarea.value = localStorage.getItem(storageKey) || "";
+  textarea.addEventListener("input", () => {
+    localStorage.setItem(storageKey, textarea.value);
+  });
+
+  wrap.appendChild(textarea);
+  return wrap;
+}
+
+function createKnowledgeBlock(lessonId, knowledgeId, paragraph) {
+  const block = document.createElement("article");
+  block.className = "knowledge-point";
+  block.dataset.knowledgeId = knowledgeId;
+
+  const header = document.createElement("div");
+  header.className = "knowledge-point-header";
+  const label = document.createElement("span");
+  label.textContent = `知识点 ${knowledgeId.replace("kp", "")}`;
+  header.appendChild(label);
+  header.appendChild(createFavoriteButton(lessonId, knowledgeId));
+
+  const text = document.createElement("p");
+  text.textContent = paragraph;
+
+  block.appendChild(header);
+  block.appendChild(text);
+  block.appendChild(createLessonNote(lessonId, knowledgeId));
+  return block;
+}
+
+function createMoodCard(index) {
+  const card = document.createElement("div");
+  card.className = "lesson-mood-card";
+  card.textContent = lessonMoodLines[index % lessonMoodLines.length];
+  return card;
+}
+
+function createCollapsible({ title, teaser = "👀 查看答案", content, explanation }) {
+  const wrap = document.createElement("div");
+  wrap.className = "lesson-collapsible";
+
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = teaser;
+
+  const body = document.createElement("div");
+  body.className = "lesson-collapsible-body hidden";
+  const text = document.createElement("p");
+  text.textContent = content;
+  body.appendChild(text);
+
+  if (explanation) {
+    const note = document.createElement("p");
+    note.textContent = explanation;
+    body.appendChild(note);
+  }
+
+  button.addEventListener("click", () => {
+    const willShow = body.classList.contains("hidden");
+    body.classList.toggle("hidden", !willShow);
+    button.textContent = willShow ? "收起答案" : teaser;
+  });
+
+  wrap.appendChild(heading);
+  wrap.appendChild(button);
+  wrap.appendChild(body);
+  return wrap;
+}
+
+function createPauseModule(module) {
+  const wrap = document.createElement("div");
+  wrap.className = "lesson-pause-card";
+
+  const title = document.createElement("h3");
+  title.textContent = module.title;
+  const question = document.createElement("p");
+  question.textContent = module.question;
+
+  wrap.appendChild(title);
+  wrap.appendChild(question);
+  wrap.appendChild(createCollapsible({
+    title: "小吴先不急着公布答案",
+    teaser: "我想好了",
+    content: module.answer,
+    explanation: module.explanation
+  }));
+  return wrap;
+}
+
+function createChapterCheckpoint(lessonId, index) {
+  const wrap = document.createElement("div");
+  wrap.className = "chapter-checkpoint";
+  wrap.innerHTML = `
+    <span>🌱</span>
+    <p>小吴：今天这一部分已经完成啦～继续努力，小树又长高一点点。</p>
+  `;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary-button";
+  button.textContent = "继续学习";
+  button.addEventListener("click", () => {
+    const next = document.querySelector(`[data-knowledge-id="kp${String(index + 2).padStart(3, "0")}"]`);
+    if (next) next.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  wrap.appendChild(button);
+  return wrap;
+}
+
+function renderReadingProgress(lessonId) {
+  const saved = Number(localStorage.getItem(lessonStorageKey(lessonId, "reading-progress"))) || 0;
+  const percent = Math.min(100, Math.max(0, Math.round(saved)));
+  readingLessonLabel.textContent = `📖 ${lessonId.replace("lesson-", "Lesson")}`;
+  readingProgressText.textContent = `${percent}%`;
+  readingProgressTrack.innerHTML = "";
+
+  for (let index = 0; index < 10; index += 1) {
+    const piece = document.createElement("span");
+    piece.className = index < Math.round(percent / 10) ? "filled" : "";
+    readingProgressTrack.appendChild(piece);
+  }
+}
+
+function updateReadingProgress() {
+  if (!currentCourseLessonId || !courseLesson) return;
+
+  const rect = courseLesson.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const total = Math.max(1, rect.height - viewportHeight * 0.45);
+  const read = Math.min(total, Math.max(0, -rect.top + viewportHeight * 0.2));
+  const percent = Math.min(100, Math.max(0, Math.round((read / total) * 100)));
+  const key = lessonStorageKey(currentCourseLessonId, "reading-progress");
+  const saved = Number(localStorage.getItem(key)) || 0;
+  const next = Math.max(saved, percent);
+
+  localStorage.setItem(key, String(next));
+  renderReadingProgress(currentCourseLessonId);
+  lessonFinishPanel.classList.toggle("hidden", next < 96);
+}
+
+function renderMemoryCarousel(lesson) {
+  const cards = lesson.memoryCard || [];
+  const state = getLessonMemoryState(lesson.lessonId);
+  currentMemoryCardIndex = Math.min(currentMemoryCardIndex, Math.max(0, cards.length - 1));
+  const card = cards[currentMemoryCardIndex];
+  courseMemoryCard.innerHTML = "";
+
+  if (!card) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "memory-carousel";
+  const rememberedCount = Object.values(state).filter((value) => value === "remembered").length;
+  const cardState = state[currentMemoryCardIndex] || "";
+  wrap.innerHTML = `
+    <div class="memory-card-slide">
+      <span>${currentMemoryCardIndex + 1} / ${cards.length}</span>
+      <strong>${card.front}</strong>
+      <em>${card.back}</em>
+      <p>${cardState === "remembered" ? "小7已经记住这张啦。" : cardState === "retry" ? "这张下次再轻轻复习一次。" : "先看正面，再在心里说出答案。"}</p>
+    </div>
+    <div class="memory-card-stats">记住率：${cards.length ? Math.round((rememberedCount / cards.length) * 100) : 0}%</div>
+  `;
+
+  const controls = document.createElement("div");
+  controls.className = "memory-card-controls";
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.className = "secondary-button";
+  previous.textContent = "上一张";
+  previous.disabled = currentMemoryCardIndex === 0;
+  previous.addEventListener("click", () => {
+    currentMemoryCardIndex = Math.max(0, currentMemoryCardIndex - 1);
+    renderMemoryCarousel(lesson);
+  });
+
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "secondary-button";
+  next.textContent = "下一张";
+  next.disabled = currentMemoryCardIndex >= cards.length - 1;
+  next.addEventListener("click", () => {
+    currentMemoryCardIndex = Math.min(cards.length - 1, currentMemoryCardIndex + 1);
+    renderMemoryCarousel(lesson);
+  });
+
+  const remembered = document.createElement("button");
+  remembered.type = "button";
+  remembered.className = "primary-button";
+  remembered.textContent = "记住了 ✅";
+  remembered.addEventListener("click", () => {
+    state[currentMemoryCardIndex] = "remembered";
+    saveLessonMemoryState(lesson.lessonId, state);
+    renderMemoryCarousel(lesson);
+  });
+
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "secondary-button";
+  retry.textContent = "没记住 🔁";
+  retry.addEventListener("click", () => {
+    state[currentMemoryCardIndex] = "retry";
+    saveLessonMemoryState(lesson.lessonId, state);
+    renderMemoryCarousel(lesson);
+  });
+
+  controls.append(previous, next, remembered, retry);
+  wrap.appendChild(controls);
+  courseMemoryCard.appendChild(wrap);
+}
+
 function renderCourse(courseDashboard) {
   const lesson = courseDashboard?.activeLesson;
   const progress = courseDashboard?.activeProgress;
@@ -260,36 +561,53 @@ function renderCourse(courseDashboard) {
   courseStartButton.textContent = progress.startedAt ? "继续学习" : "开始学习";
   courseCompleteButton.textContent = progress.isCompleted ? "这一课已完成 🌿" : "完成这一课 🌿";
   courseCompleteButton.disabled = progress.isCompleted;
+  renderReadingProgress(lesson.lessonId);
+  currentMemoryCardIndex = 0;
 
   courseStory.innerHTML = "";
-  lesson.story.forEach((paragraph) => {
-    const text = document.createElement("p");
-    text.textContent = paragraph;
-    courseStory.appendChild(text);
+  const pauseModules = lessonPauseModules[lesson.lessonId] || [];
+  const story = lesson.story || [];
+  story.forEach((paragraph, index) => {
+    const knowledgeId = `kp${String(index + 1).padStart(3, "0")}`;
+    courseStory.appendChild(createKnowledgeBlock(lesson.lessonId, knowledgeId, paragraph));
+
+    pauseModules
+      .filter((module) => module.afterIndex === index)
+      .forEach((module) => courseStory.appendChild(createPauseModule(module)));
+
+    if ((index + 1) % 4 === 0 && index < story.length - 1) {
+      courseStory.appendChild(createMoodCard(index));
+    }
+
+    if (paragraph.startsWith("📖 第") && index < story.length - 1) {
+      courseStory.appendChild(createChapterCheckpoint(lesson.lessonId, index));
+    }
   });
 
   courseImportance.textContent = lesson.whyImportant || lesson.importanceReason?.body || "";
-  renderList(courseExamPoints, lesson.examPoints.slice(0, 5));
-  renderList(courseCommonMistakes, lesson.commonMistakes.slice(0, 3));
+  renderList(courseExamPoints, (lesson.examPoints || []).slice(0, 5));
+  renderList(courseCommonMistakes, (lesson.commonMistakes || []).slice(0, 3));
   courseMemoryTip.textContent = lesson.understanding || lesson.memoryTip;
-  courseMemoryCard.innerHTML = "";
-  (lesson.memoryCard || []).forEach((card) => {
-    const row = document.createElement("div");
-    row.className = "memory-card-row";
-    row.innerHTML = `<strong>${card.front}</strong><span>↓</span><em>${card.back}</em>`;
-    courseMemoryCard.appendChild(row);
-  });
+  renderMemoryCarousel(lesson);
   courseTodaySentence.textContent = lesson.todaySentence;
-  courseExamTrap.textContent = lesson.examTrap || "";
+  courseExamTrap.innerHTML = "";
+  courseExamTrap.appendChild(createCollapsible({
+    title: "考试陷阱先折起来，小7想好了再看。",
+    content: lesson.examTrap || "",
+    explanation: "先自己判断一次，再打开解析，会比直接看答案记得更牢。"
+  }));
   courseKeywords.innerHTML = "";
-  lesson.keywords.forEach((keyword) => {
+  (lesson.keywords || []).forEach((keyword) => {
     const item = document.createElement("span");
     item.textContent = keyword;
     courseKeywords.appendChild(item);
   });
-  coursePracticeText.textContent = lesson.afterLesson || `原创题 ${lesson.practiceQuestionIds.length} 道 / 官方过去问 ${lesson.officialQuestionIds.length} 道。先理解，再做题，小吴陪小7把这一课真正落下来。`;
+  coursePracticeText.textContent = lesson.afterLesson || `原创题 ${lesson.practiceQuestionIds?.length || 0} 道 / 官方过去问 ${lesson.officialQuestionIds?.length || 0} 道。先理解，再做题，小吴陪小7把这一课真正落下来。`;
   courseSummary.textContent = lesson.summary;
   courseReward.textContent = `${lesson.completionReward.treeIcon} 完成奖励：成长值 +${lesson.completionReward.growthValue}。${lesson.completionReward.message}`;
+  lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：知识点 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
+  lessonFinishPanel.querySelector("span").textContent = `🎉 ${lesson.lessonId.replace("lesson-", "Lesson")} 完成！`;
+  updateReadingProgress();
 }
 
 function renderCourseList(cards, activeLessonId) {
@@ -895,6 +1213,7 @@ startStudyButton.addEventListener("click", startStudyTimer);
 completeTodayButton.addEventListener("click", completeTodayPlan);
 courseStartButton.addEventListener("click", startCourseLesson);
 courseCompleteButton.addEventListener("click", completeCourseLesson);
+lessonFinishButton.addEventListener("click", completeCourseLesson);
 courseOriginalPracticeButton.addEventListener("click", () => {
   setQuestionSource("original");
   startQuiz();
@@ -916,6 +1235,7 @@ submitAnswerButton.addEventListener("click", submitAnswer);
 nextQuestionButton.addEventListener("click", goNextQuestion);
 restartQuizButton.addEventListener("click", startQuiz);
 toggleMistakesButton.addEventListener("click", toggleMistakePanel);
+window.addEventListener("scroll", updateReadingProgress, { passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     stopStudyTimer();
