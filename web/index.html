@@ -18,16 +18,56 @@
       <section class="status-grid" aria-label="今日状态">
         <article class="stat-card">
           <span>距离考试</span>
-          <strong>约90天</strong>
+          <strong id="daysUntilExamStat">计算中</strong>
         </article>
         <article class="stat-card">
           <span>当前阶段</span>
-          <strong>基础建立期</strong>
+          <strong id="studyPhaseStat">基础建立期</strong>
         </article>
         <article class="stat-card">
           <span>连续学习</span>
-          <strong>1天</strong>
+          <strong id="studyStreakStat">0天</strong>
         </article>
+      </section>
+
+      <section class="card growth-tree-card">
+        <div class="section-heading">
+          <p class="eyebrow">Growth Tree</p>
+          <h2>🌳 小7成长树</h2>
+        </div>
+        <div class="tree-main">
+          <div class="tree-visual" id="treeVisual">🌱</div>
+          <div class="tree-stage-info">
+            <span>当前成长阶段</span>
+            <strong id="treeStageName">发芽</strong>
+            <div class="tree-progress">
+              <span id="treeProgressBar"></span>
+            </div>
+            <p id="treePercent">0%</p>
+          </div>
+        </div>
+        <div class="tree-growth-grid">
+          <article>
+            <span>🌿 今日成长值</span>
+            <strong id="treeTodayGrowth">+0</strong>
+          </article>
+          <article>
+            <span>累计成长值</span>
+            <strong id="treeTotalGrowth">0</strong>
+          </article>
+        </div>
+        <div class="gardener-note">
+          <span>👨‍🌾 小吴园丁</span>
+          <p id="treeGardenerMessage"></p>
+        </div>
+        <div class="tree-next">
+          <span>今天如何让成长树继续成长</span>
+          <p id="treeNextSteps"></p>
+        </div>
+        <div class="tree-history">
+          <h3>成长记录</h3>
+          <div id="treeHistoryList"></div>
+        </div>
       </section>
 
       <section class="card study-time-card" aria-label="小7的学习时间">
@@ -48,21 +88,184 @@
         <p class="study-time-note">小7的每一分钟努力，小吴都帮你记着。</p>
       </section>
 
-      <section class="card today-task">
+      <section class="card daily-analysis-card">
         <div class="section-heading">
-          <p class="eyebrow">Today's Focus</p>
-          <h2>今日任务</h2>
+          <p class="eyebrow">小吴分析</p>
+          <h2>❤️ 小吴今天想对小7说</h2>
         </div>
-        <div class="focus-line">
-          <span>宅建業法</span>
-          <strong>免許制度</strong>
+        <p class="daily-analysis" id="dailyAnalysisText"></p>
+      </section>
+
+      <section class="card today-task brain-card" id="brainCard">
+        <div class="section-heading">
+          <p class="eyebrow">小吴大脑</p>
+          <h2>🌸 小吴今天陪你完成</h2>
         </div>
-        <ul class="task-list">
-          <li>学习 30 分钟</li>
-          <li>做题 10-15 道</li>
-          <li>记录 1-3 道错题</li>
-        </ul>
+
+        <div class="brain-summary">
+          <div>
+            <span>今天的小目标</span>
+            <strong id="brainGoal">小吴正在生成今天的小目标...</strong>
+          </div>
+          <div>
+            <span>预计学习时间</span>
+            <strong id="brainTime">--</strong>
+          </div>
+        </div>
+
+        <div class="brain-block">
+          <h3>今日任务清单</h3>
+          <div class="brain-task-list" id="brainTaskList"></div>
+        </div>
+
+        <div class="brain-two-col">
+          <div class="brain-note">
+            <span>今天先学什么</span>
+            <p id="brainFirstFocus"></p>
+          </div>
+          <div class="brain-note">
+            <span>今天不用学什么</span>
+            <p id="brainSkip"></p>
+          </div>
+        </div>
+
+        <div class="brain-reason">
+          <span>小吴为什么这样安排</span>
+          <p id="brainReason"></p>
+        </div>
+
+        <p class="brain-gentle hidden" id="brainGentleReminder"></p>
+        <p class="brain-complete-message hidden" id="brainCompleteMessage"></p>
         <button class="primary-button" id="startStudyButton" type="button">开始今天的学习</button>
+        <button class="secondary-button" id="completeTodayButton" type="button">今天完成啦 🌸</button>
+      </section>
+
+      <section class="card course-card" id="courseCard">
+        <div class="section-heading">
+          <p class="eyebrow">XiaoWu Course</p>
+          <h2>📚 小吴课程</h2>
+        </div>
+
+        <div class="course-cover">
+          <div>
+            <span id="courseLessonLabel">第一课</span>
+            <strong id="courseTitle">免許制度</strong>
+            <p id="courseMeta">宅建業法 / 预计25分钟 / 重要程度 ★★★★★</p>
+          </div>
+          <div class="course-progress-badge" id="courseProgressBadge">0%</div>
+        </div>
+
+        <div class="course-progress">
+          <span id="courseProgressBar"></span>
+        </div>
+
+        <div class="course-actions">
+          <button class="primary-button" id="courseStartButton" type="button">开始学习</button>
+          <button class="secondary-button" id="courseCompleteButton" type="button">完成这一课 🌿</button>
+        </div>
+
+        <div class="course-lesson" id="courseLesson">
+          <div class="course-story">
+            <span>小吴开场</span>
+            <div id="courseStory"></div>
+          </div>
+
+          <div class="lesson-grid">
+            <article>
+              <h3>本课重点</h3>
+              <ul id="courseExamPoints"></ul>
+            </article>
+            <article>
+              <h3>最容易错</h3>
+              <ul id="courseCommonMistakes"></ul>
+            </article>
+          </div>
+
+          <div class="lesson-tip">
+            <span>小吴记忆法</span>
+            <p id="courseMemoryTip"></p>
+          </div>
+
+          <div class="course-sentence">
+            <span>今天一句话</span>
+            <strong id="courseTodaySentence"></strong>
+          </div>
+
+          <div class="course-keywords" id="courseKeywords"></div>
+
+          <div class="course-practice">
+            <span>今日练习</span>
+            <p id="coursePracticeText"></p>
+            <div class="course-actions">
+              <button class="secondary-button" id="courseOriginalPracticeButton" type="button">原创题练习</button>
+              <button class="secondary-button" id="courseOfficialPracticeButton" type="button">官方过去问</button>
+            </div>
+          </div>
+
+          <div class="course-summary">
+            <span>小吴总结</span>
+            <p id="courseSummary"></p>
+          </div>
+
+          <p class="course-reward" id="courseReward"></p>
+        </div>
+      </section>
+
+      <section class="card learning-map-card">
+        <div class="section-heading">
+          <p class="eyebrow">Learning Map</p>
+          <h2>🌸 小7的学习地图</h2>
+        </div>
+        <div class="map-legend">
+          <span>⬜ 未学习</span>
+          <span>🟨 学习中</span>
+          <span>🟩 已掌握</span>
+          <span>⭐ 高频重点</span>
+        </div>
+        <div class="learning-map" id="learningMap"></div>
+      </section>
+
+      <section class="card growth-record-card">
+        <div class="section-heading">
+          <p class="eyebrow">Growth</p>
+          <h2>📈 小7成长记录</h2>
+        </div>
+        <div class="growth-grid">
+          <article>
+            <span>累计学习时间</span>
+            <strong id="growthTotalStudy">0分00秒</strong>
+          </article>
+          <article>
+            <span>累计做题数</span>
+            <strong id="growthTotalAnswers">0</strong>
+          </article>
+          <article>
+            <span>累计正确率</span>
+            <strong id="growthAccuracy">0%</strong>
+          </article>
+          <article>
+            <span>累计错题数</span>
+            <strong id="growthMistakes">0</strong>
+          </article>
+          <article>
+            <span>连续学习天数</span>
+            <strong id="growthStreak">0天</strong>
+          </article>
+          <article>
+            <span>累计完成任务数</span>
+            <strong id="growthCompletedTasks">0</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="card xiaowu-message-card">
+        <div class="section-heading">
+          <p class="eyebrow">Message</p>
+          <h2>🌸 小吴每日一句</h2>
+        </div>
+        <p class="daily-line" id="dailyLineText"></p>
+        <h3>🌷 小吴鼓励</h3>
+        <p class="encouragement-line" id="encouragementText"></p>
       </section>
 
       <section class="card advice">
@@ -263,6 +466,9 @@
 
     <script src="questions.js"></script>
     <script src="pastQuestions.js"></script>
+    <script src="course/course-index.js"></script>
+    <script src="course/course-engine.js"></script>
+    <script src="brain.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

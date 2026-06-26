@@ -3,8 +3,57 @@ const correctInput = document.querySelector("#correctQuestions");
 const scoreBox = document.querySelector("#scoreBox");
 const companionMessage = document.querySelector("#companionMessage");
 const startStudyButton = document.querySelector("#startStudyButton");
+const daysUntilExamStat = document.querySelector("#daysUntilExamStat");
+const studyPhaseStat = document.querySelector("#studyPhaseStat");
+const studyStreakStat = document.querySelector("#studyStreakStat");
+const dailyAnalysisText = document.querySelector("#dailyAnalysisText");
+const brainGoal = document.querySelector("#brainGoal");
+const brainTime = document.querySelector("#brainTime");
+const brainTaskList = document.querySelector("#brainTaskList");
+const brainFirstFocus = document.querySelector("#brainFirstFocus");
+const brainSkip = document.querySelector("#brainSkip");
+const brainReason = document.querySelector("#brainReason");
+const brainGentleReminder = document.querySelector("#brainGentleReminder");
+const brainCompleteMessage = document.querySelector("#brainCompleteMessage");
+const completeTodayButton = document.querySelector("#completeTodayButton");
+const learningMap = document.querySelector("#learningMap");
+const growthTotalStudy = document.querySelector("#growthTotalStudy");
+const growthTotalAnswers = document.querySelector("#growthTotalAnswers");
+const growthAccuracy = document.querySelector("#growthAccuracy");
+const growthMistakes = document.querySelector("#growthMistakes");
+const growthStreak = document.querySelector("#growthStreak");
+const growthCompletedTasks = document.querySelector("#growthCompletedTasks");
+const treeVisual = document.querySelector("#treeVisual");
+const treeStageName = document.querySelector("#treeStageName");
+const treeProgressBar = document.querySelector("#treeProgressBar");
+const treePercent = document.querySelector("#treePercent");
+const treeTodayGrowth = document.querySelector("#treeTodayGrowth");
+const treeTotalGrowth = document.querySelector("#treeTotalGrowth");
+const treeGardenerMessage = document.querySelector("#treeGardenerMessage");
+const treeNextSteps = document.querySelector("#treeNextSteps");
+const treeHistoryList = document.querySelector("#treeHistoryList");
+const dailyLineText = document.querySelector("#dailyLineText");
+const encouragementText = document.querySelector("#encouragementText");
 const todayStudyTime = document.querySelector("#todayStudyTime");
 const totalStudyTime = document.querySelector("#totalStudyTime");
+const courseLessonLabel = document.querySelector("#courseLessonLabel");
+const courseTitle = document.querySelector("#courseTitle");
+const courseMeta = document.querySelector("#courseMeta");
+const courseProgressBadge = document.querySelector("#courseProgressBadge");
+const courseProgressBar = document.querySelector("#courseProgressBar");
+const courseStartButton = document.querySelector("#courseStartButton");
+const courseCompleteButton = document.querySelector("#courseCompleteButton");
+const courseStory = document.querySelector("#courseStory");
+const courseExamPoints = document.querySelector("#courseExamPoints");
+const courseCommonMistakes = document.querySelector("#courseCommonMistakes");
+const courseMemoryTip = document.querySelector("#courseMemoryTip");
+const courseTodaySentence = document.querySelector("#courseTodaySentence");
+const courseKeywords = document.querySelector("#courseKeywords");
+const coursePracticeText = document.querySelector("#coursePracticeText");
+const courseOriginalPracticeButton = document.querySelector("#courseOriginalPracticeButton");
+const courseOfficialPracticeButton = document.querySelector("#courseOfficialPracticeButton");
+const courseSummary = document.querySelector("#courseSummary");
+const courseReward = document.querySelector("#courseReward");
 const startQuizButton = document.querySelector("#startQuizButton");
 const quizIntro = document.querySelector("#quizIntro");
 const quizPanel = document.querySelector("#quizPanel");
@@ -56,6 +105,7 @@ const mistakeHistoryKey = "takken_mistake_history_v1";
 const todayStudyKey = "takken_today_study_seconds_v1";
 const totalStudyKey = "takken_total_study_seconds_v1";
 const studyDateKey = "takken_today_study_date_v1";
+const dailyStudyLogKey = "takken_daily_study_log_v1";
 const coachLines = [
   "小7，这题我们慢慢来。",
   "别急，这一题 Scan 陪你拆开理解。",
@@ -126,6 +176,8 @@ let answered = false;
 let studyTimerId = null;
 let lastStudyTick = null;
 let isStudyTiming = false;
+let currentBrainPlan = null;
+let currentCourseLessonId = "";
 
 function readStorage(key) {
   try {
@@ -137,6 +189,176 @@ function readStorage(key) {
 
 function writeStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function renderBrainPlan() {
+  const dashboard = window.xiaoWuBrain.buildDashboard();
+  currentBrainPlan = dashboard.plan;
+  daysUntilExamStat.textContent = `${dashboard.daysUntilExam}天`;
+  studyPhaseStat.textContent = dashboard.phase;
+  studyStreakStat.textContent = `${dashboard.streak}天`;
+  dailyAnalysisText.textContent = dashboard.analysis;
+  renderLearningMap(dashboard.learningMap);
+  renderGrowth(dashboard.growth);
+  renderGrowthTree(dashboard.growthTree);
+  renderCourse(dashboard.course);
+  dailyLineText.textContent = dashboard.dailyLine;
+  encouragementText.textContent = dashboard.encouragement;
+  brainGoal.textContent = currentBrainPlan.goal;
+  brainTime.textContent = `${currentBrainPlan.estimatedMinutes}分钟左右`;
+  brainFirstFocus.textContent = currentBrainPlan.firstFocus;
+  brainSkip.textContent = currentBrainPlan.skip;
+  brainReason.textContent = currentBrainPlan.reason;
+  brainGentleReminder.textContent = currentBrainPlan.gentleReminder;
+  brainGentleReminder.classList.remove("hidden");
+  brainCompleteMessage.classList.toggle("hidden", !currentBrainPlan.completed);
+  completeTodayButton.textContent = currentBrainPlan.completed ? "今天已完成" : "今天完成啦 🌸";
+  completeTodayButton.disabled = currentBrainPlan.completed;
+
+  if (currentBrainPlan.completed) {
+    brainCompleteMessage.textContent = "小7今天辛苦啦。今天不是只完成了任务，而是又离宅建合格近了一点点。小吴已经帮你记下今天的努力。";
+  }
+
+  brainTaskList.innerHTML = "";
+  currentBrainPlan.tasks.forEach((task) => {
+    const button = document.createElement("button");
+    button.className = `brain-task${task.done ? " done" : ""}`;
+    button.type = "button";
+    button.dataset.taskId = task.id;
+    button.innerHTML = `<span>${task.done ? "✓" : "□"}</span>${task.text}`;
+    button.addEventListener("click", () => toggleBrainTask(task.id));
+    brainTaskList.appendChild(button);
+  });
+}
+
+function renderList(container, items) {
+  container.innerHTML = "";
+  items.forEach((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    container.appendChild(item);
+  });
+}
+
+function renderCourse(courseDashboard) {
+  const lesson = courseDashboard?.activeLesson;
+  const progress = courseDashboard?.activeProgress;
+
+  if (!lesson || !progress) return;
+
+  currentCourseLessonId = lesson.lessonId;
+  courseLessonLabel.textContent = lesson.intro?.label || lesson.lessonId;
+  courseTitle.textContent = lesson.title;
+  courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes}分钟 / 重要程度 ${lesson.importance}`;
+  courseProgressBadge.textContent = `${progress.percent}%`;
+  courseProgressBar.style.width = `${progress.percent}%`;
+  courseStartButton.textContent = progress.startedAt ? "继续学习" : "开始学习";
+  courseCompleteButton.textContent = progress.isCompleted ? "这一课已完成 🌿" : "完成这一课 🌿";
+  courseCompleteButton.disabled = progress.isCompleted;
+
+  courseStory.innerHTML = "";
+  lesson.story.forEach((paragraph) => {
+    const text = document.createElement("p");
+    text.textContent = paragraph;
+    courseStory.appendChild(text);
+  });
+
+  renderList(courseExamPoints, lesson.examPoints.slice(0, 5));
+  renderList(courseCommonMistakes, lesson.commonMistakes.slice(0, 3));
+  courseMemoryTip.textContent = lesson.memoryTip;
+  courseTodaySentence.textContent = lesson.todaySentence;
+  courseKeywords.innerHTML = "";
+  lesson.keywords.forEach((keyword) => {
+    const item = document.createElement("span");
+    item.textContent = keyword;
+    courseKeywords.appendChild(item);
+  });
+  coursePracticeText.textContent = `原创题 ${lesson.practiceQuestionIds.length} 道 / 官方过去问 ${lesson.officialQuestionIds.length} 道。先理解，再做题，小吴陪小7把这一课真正落下来。`;
+  courseSummary.textContent = lesson.summary;
+  courseReward.textContent = `${lesson.completionReward.treeIcon} 完成奖励：成长值 +${lesson.completionReward.growthValue}。${lesson.completionReward.message}`;
+}
+
+function renderLearningMap(sections) {
+  learningMap.innerHTML = "";
+  sections.forEach((section) => {
+    const block = document.createElement("article");
+    block.className = "map-section";
+    const title = document.createElement("h3");
+    title.textContent = section.subject;
+    const list = document.createElement("div");
+    list.className = "map-topic-list";
+
+    section.topics.forEach((topic) => {
+      const item = document.createElement("div");
+      item.className = `map-topic ${topic.state}`;
+      item.innerHTML = `<span>${topic.icon}</span><strong>${topic.name}</strong>${topic.isHigh ? "<em>⭐</em>" : ""}`;
+      list.appendChild(item);
+    });
+
+    block.appendChild(title);
+    block.appendChild(list);
+    learningMap.appendChild(block);
+  });
+}
+
+function renderGrowth(growth) {
+  growthTotalStudy.textContent = growth.totalStudy;
+  growthTotalAnswers.textContent = String(growth.totalAnswers);
+  growthAccuracy.textContent = growth.totalAccuracy;
+  growthMistakes.textContent = String(growth.totalMistakes);
+  growthStreak.textContent = growth.streak;
+  growthCompletedTasks.textContent = String(growth.completedTasks);
+}
+
+function renderGrowthTree(stages) {
+  treeVisual.textContent = stages.stage.icon;
+  treeStageName.textContent = stages.stage.name;
+  treeProgressBar.style.width = `${stages.percent}%`;
+  treePercent.textContent = `${stages.percent}%`;
+  treeTodayGrowth.textContent = `+${stages.todayGrowth}`;
+  treeTotalGrowth.textContent = String(stages.growthValue);
+  treeGardenerMessage.textContent = stages.gardenerMessage;
+  treeNextSteps.textContent = stages.nextSteps;
+  treeHistoryList.innerHTML = "";
+
+  stages.history.slice(0, 5).forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "tree-history-item";
+    item.innerHTML = `<span>${entry.date}</span><strong>${entry.icon}</strong><p>${entry.text}</p>`;
+    treeHistoryList.appendChild(item);
+  });
+}
+
+function toggleBrainTask(taskId) {
+  if (!currentBrainPlan) return;
+
+  currentBrainPlan.tasks = currentBrainPlan.tasks.map((task) => (
+    task.id === taskId ? { ...task, done: !task.done } : task
+  ));
+  window.xiaoWuBrain.saveTaskState(currentBrainPlan.tasks);
+  renderBrainPlan();
+}
+
+function completeTodayPlan() {
+  if (!currentBrainPlan || currentBrainPlan.completed) return;
+
+  currentBrainPlan.tasks = currentBrainPlan.tasks.map((task) => ({ ...task, done: true }));
+  window.xiaoWuBrain.saveTaskState(currentBrainPlan.tasks);
+  currentBrainPlan = window.xiaoWuBrain.completeToday(currentBrainPlan);
+  renderBrainPlan();
+}
+
+function startCourseLesson() {
+  if (!currentCourseLessonId) return;
+  startStudyTimer();
+  window.xiaoWuCourseEngine.startLesson(currentCourseLessonId);
+  renderBrainPlan();
+}
+
+function completeCourseLesson() {
+  if (!currentCourseLessonId) return;
+  window.xiaoWuCourseEngine.completeLesson(currentCourseLessonId);
+  renderBrainPlan();
 }
 
 function getTodayKey() {
@@ -195,10 +417,23 @@ function saveStudyDelta() {
 
   if (deltaSeconds > 0) {
     ensureStudyDate();
+    const today = getTodayKey();
+    const dailyStudyLog = readStorageObject(dailyStudyLogKey);
     writeNumberStorage(todayStudyKey, readNumberStorage(todayStudyKey) + deltaSeconds);
     writeNumberStorage(totalStudyKey, readNumberStorage(totalStudyKey) + deltaSeconds);
+    dailyStudyLog[today] = (Number(dailyStudyLog[today]) || 0) + deltaSeconds;
+    localStorage.setItem(dailyStudyLogKey, JSON.stringify(dailyStudyLog));
     lastStudyTick += deltaSeconds * 1000;
     renderStudyTime();
+  }
+}
+
+function readStorageObject(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
   }
 }
 
@@ -429,6 +664,7 @@ function submitAnswer() {
   submitAnswerButton.disabled = true;
   saveAnswerRecord(question, isCorrect, scanTeaching);
   renderMistakeHistory();
+  renderBrainPlan();
 }
 
 function saveAnswerRecord(question, isCorrect, scanTeaching) {
@@ -620,10 +856,25 @@ function toggleMistakePanel() {
 }
 
 setCompanionGreeting();
+renderBrainPlan();
 renderStudyTime();
 renderMistakeHistory();
 setQuestionSource("original", false);
+window.addEventListener("xiaowu-course-ready", renderBrainPlan);
 startStudyButton.addEventListener("click", startStudyTimer);
+completeTodayButton.addEventListener("click", completeTodayPlan);
+courseStartButton.addEventListener("click", startCourseLesson);
+courseCompleteButton.addEventListener("click", completeCourseLesson);
+courseOriginalPracticeButton.addEventListener("click", () => {
+  setQuestionSource("original");
+  startQuiz();
+  quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+courseOfficialPracticeButton.addEventListener("click", () => {
+  setQuestionSource("past");
+  startQuiz();
+  quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 originalSourceButton.addEventListener("click", () => {
   setQuestionSource("original");
 });
