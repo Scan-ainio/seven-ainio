@@ -3,6 +3,10 @@ const courseTitle = document.querySelector("#courseTitle");
 const courseMeta = document.querySelector("#courseMeta");
 const courseProgressBadge = document.querySelector("#courseProgressBadge");
 const courseProgressBar = document.querySelector("#courseProgressBar");
+const lessonPageTitle = document.querySelector("#lessonPageTitle");
+const lessonPageSubtitle = document.querySelector("#lessonPageSubtitle");
+const lessonPageTime = document.querySelector("#lessonPageTime");
+const lessonPageProgress = document.querySelector("#lessonPageProgress");
 const readingLessonLabel = document.querySelector("#readingLessonLabel");
 const readingProgressTrack = document.querySelector("#readingProgressTrack");
 const readingProgressText = document.querySelector("#readingProgressText");
@@ -36,6 +40,36 @@ let currentMemoryCardIndex = 0;
 let studyTimerId = null;
 let lastStudyTick = null;
 let isStudyTiming = false;
+let completedCheckpointIds = new Set();
+
+const lessonSequence = [
+  { lessonId: "lesson-001", video: "lesson-001.mp4", status: "ready" },
+  { lessonId: "lesson-002", video: "lesson-002.mp4", status: "pending" },
+  { lessonId: "lesson-003", video: "lesson-003.mp4", status: "pending" }
+];
+
+const lessonChapterLabels = {
+  "lesson-001": [
+    "第1章｜今天这节课到底在讲什么",
+    "第1章｜老师这一小时真正想讲什么",
+    "第2章｜免許取消和5年限制",
+    "第2章｜先停一下，确认判断顺序",
+    "第3章｜役員60日规则",
+    "第4章｜業務停止和免許取消不是一回事",
+    "第5章｜未成年者与法定代理人",
+    "第5章｜未成年者题目的判断顺序",
+    "第6章｜営業保証金",
+    "第6章｜還付后的补充供託",
+    "第7章｜保証協会",
+    "第7章｜保証協会的期限和金钱规则",
+    "第8章｜還付・取戻し・公告",
+    "第8章｜公告主语和取戻し陷阱",
+    "第9章｜小吴记忆卡",
+    "第10章｜考试陷阱",
+    "第11章｜成长树提示",
+    "第11章｜今天的小结"
+  ]
+};
 
 const lessonPauseModules = {
   "lesson-001": [
@@ -160,6 +194,30 @@ function lessonStorageKey(lessonId, suffix) {
   return `${lessonId}-${suffix}`;
 }
 
+function getReadingProgressValue(lessonId) {
+  return Math.min(100, Math.max(0, Math.round(Number(localStorage.getItem(lessonStorageKey(lessonId, "reading-progress"))) || 0)));
+}
+
+function getSavedScrollY(lessonId) {
+  return Math.max(0, Math.round(Number(localStorage.getItem(lessonStorageKey(lessonId, "reading-scroll-y"))) || 0));
+}
+
+function saveCompletedCheckpoints(lessonId) {
+  writeStorage(lessonStorageKey(lessonId, "completed-chapters"), [...completedCheckpointIds]);
+}
+
+function loadCompletedCheckpoints(lessonId) {
+  completedCheckpointIds = new Set(readStorage(lessonStorageKey(lessonId, "completed-chapters")));
+}
+
+function getCompletionGateOpen(lessonId) {
+  const progress = getReadingProgressValue(lessonId);
+  const checkpoints = document.querySelectorAll(".chapter-checkpoint").length;
+  const reachedBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
+  const courseProgress = window.xiaoWuCourseEngine?.getLessonProgress(lessonId);
+  return Boolean(courseProgress?.isCompleted) || progress >= 90 || reachedBottom || completedCheckpointIds.size >= checkpoints && checkpoints > 0;
+}
+
 function getLessonFavorites(lessonId) {
   return readStorage(lessonStorageKey(lessonId, "favorites"));
 }
@@ -221,7 +279,11 @@ function createLessonNote(lessonId, knowledgeId) {
   return wrap;
 }
 
-function createKnowledgeBlock(lessonId, knowledgeId, paragraph) {
+function getChapterLabel(lessonId, index) {
+  return lessonChapterLabels[lessonId]?.[index] || `第${index + 1}章｜小吴课堂`;
+}
+
+function createKnowledgeBlock(lessonId, knowledgeId, paragraph, index) {
   const block = document.createElement("article");
   block.className = "knowledge-point";
   block.dataset.knowledgeId = knowledgeId;
@@ -229,7 +291,7 @@ function createKnowledgeBlock(lessonId, knowledgeId, paragraph) {
   const header = document.createElement("div");
   header.className = "knowledge-point-header";
   const label = document.createElement("span");
-  label.textContent = `知识点 ${knowledgeId.replace("kp", "")}`;
+  label.textContent = getChapterLabel(lessonId, index);
   header.append(label, createFavoriteButton(lessonId, knowledgeId));
 
   const text = document.createElement("p");
@@ -290,14 +352,21 @@ function createPauseModule(module) {
 }
 
 function createChapterCheckpoint(index) {
+  const checkpointId = `chapter-${index}`;
   const wrap = document.createElement("div");
-  wrap.className = "chapter-checkpoint";
+  wrap.className = `chapter-checkpoint${completedCheckpointIds.has(checkpointId) ? " completed" : ""}`;
+  wrap.dataset.checkpointId = checkpointId;
   wrap.innerHTML = "<span>🌱</span><p>小吴：今天这一部分已经完成啦～继续努力，小树又长高一点点。</p>";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "secondary-button";
-  button.textContent = "继续学习";
+  button.textContent = completedCheckpointIds.has(checkpointId) ? "这一章已完成" : "继续学习";
   button.addEventListener("click", () => {
+    completedCheckpointIds.add(checkpointId);
+    saveCompletedCheckpoints(currentLessonId);
+    wrap.classList.add("completed");
+    button.textContent = "这一章已完成";
+    updateFinishPanelVisibility();
     const next = document.querySelector(`[data-knowledge-id="kp${String(index + 2).padStart(3, "0")}"]`);
     if (next) next.scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -306,10 +375,10 @@ function createChapterCheckpoint(index) {
 }
 
 function renderReadingProgress(lessonId) {
-  const saved = Number(localStorage.getItem(lessonStorageKey(lessonId, "reading-progress"))) || 0;
-  const percent = Math.min(100, Math.max(0, Math.round(saved)));
+  const percent = getReadingProgressValue(lessonId);
   readingLessonLabel.textContent = `📖 ${lessonId.replace("lesson-", "Lesson")}`;
   readingProgressText.textContent = `${percent}%`;
+  lessonPageProgress.textContent = `阅读进度 ${percent}%`;
   readingProgressTrack.innerHTML = "";
 
   for (let index = 0; index < 10; index += 1) {
@@ -317,6 +386,13 @@ function renderReadingProgress(lessonId) {
     piece.className = index < Math.round(percent / 10) ? "filled" : "";
     readingProgressTrack.appendChild(piece);
   }
+}
+
+function updateFinishPanelVisibility() {
+  const isOpen = getCompletionGateOpen(currentLessonId);
+  lessonFinishPanel.classList.toggle("hidden", !isOpen);
+  courseReward.classList.toggle("hidden", !isOpen);
+  courseCompleteButton.classList.add("hidden");
 }
 
 function updateReadingProgress() {
@@ -330,8 +406,11 @@ function updateReadingProgress() {
   const saved = Number(localStorage.getItem(key)) || 0;
   const next = Math.max(saved, percent);
   localStorage.setItem(key, String(next));
+  const savedScrollY = getSavedScrollY(currentLessonId);
+  const currentScrollY = Math.max(0, Math.round(window.scrollY || 0));
+  localStorage.setItem(lessonStorageKey(currentLessonId, "reading-scroll-y"), String(Math.max(savedScrollY, currentScrollY)));
   renderReadingProgress(currentLessonId);
-  lessonFinishPanel.classList.toggle("hidden", next < 96);
+  updateFinishPanelVisibility();
 }
 
 function renderMemoryCarousel(lesson) {
@@ -385,21 +464,32 @@ function renderLesson() {
   const story = lesson.story || [];
   const pauseModules = lessonPauseModules[lesson.lessonId] || [];
   currentLessonId = lesson.lessonId;
+  loadCompletedCheckpoints(lesson.lessonId);
+  const savedProgress = getReadingProgressValue(lesson.lessonId);
+  const savedScrollY = getSavedScrollY(lesson.lessonId);
+  const lessonLabel = lesson.lessonId.replace("lesson-", "Lesson");
+  const cleanTitle = lesson.title.replace(" 入门复习", "").replace("・保証協会入门复习", "・保証協会");
 
-  courseLessonLabel.textContent = lesson.lessonId.replace("lesson-", "Lesson");
+  lessonPageTitle.textContent = lessonLabel;
+  lessonPageSubtitle.textContent = cleanTitle;
+  lessonPageTime.textContent = "预计 35分钟";
+  lessonPageProgress.textContent = `阅读进度 ${savedProgress}%`;
+  courseLessonLabel.textContent = lessonLabel;
   courseTitle.textContent = lesson.title;
-  courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes || 35}分钟 / 视频课体系`;
+  courseMeta.textContent = `${lesson.subject} / 预计35分钟 / LEC 视频课体系`;
   courseProgressBadge.textContent = `${progress.percent}%`;
   courseProgressBar.style.width = `${progress.percent}%`;
-  courseStartButton.textContent = progress.startedAt ? "继续学习" : "开始本课学习";
+  courseStartButton.textContent = "继续上次位置";
+  courseStartButton.classList.toggle("hidden", savedProgress <= 0 || savedScrollY <= 0 || progress.isCompleted);
   courseCompleteButton.textContent = progress.isCompleted ? "这一课已完成 🌿" : "完成这一课 🌿";
   courseCompleteButton.disabled = progress.isCompleted;
+  courseCompleteButton.classList.add("hidden");
   currentMemoryCardIndex = Math.min(currentMemoryCardIndex, Math.max(0, (lesson.memoryCard || []).length - 1));
 
   courseStory.innerHTML = "";
   story.forEach((paragraph, index) => {
     const knowledgeId = `kp${String(index + 1).padStart(3, "0")}`;
-    courseStory.appendChild(createKnowledgeBlock(lesson.lessonId, knowledgeId, paragraph));
+    courseStory.appendChild(createKnowledgeBlock(lesson.lessonId, knowledgeId, paragraph, index));
     pauseModules.filter((module) => module.afterIndex === index).forEach((module) => courseStory.appendChild(createPauseModule(module)));
     if ((index + 1) % 4 === 0 && index < story.length - 1) courseStory.appendChild(createMoodCard(index));
     if (paragraph.startsWith("📖 第") && index < story.length - 1) courseStory.appendChild(createChapterCheckpoint(index));
@@ -425,17 +515,20 @@ function renderLesson() {
   });
   coursePracticeText.textContent = lesson.afterLesson || "学完以后，先做原创题，再做官方过去问。";
   courseSummary.textContent = lesson.summary || "";
-  lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：知识点 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
-  lessonFinishPanel.querySelector("span").textContent = `🎉 ${lesson.lessonId.replace("lesson-", "Lesson")} 完成！`;
+  lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：课堂章节 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
+  lessonFinishPanel.querySelector("span").textContent = `🎉 ${lessonLabel} 完成！`;
   courseReward.textContent = `${lesson.completionReward?.treeIcon || "🌿"} 完成奖励：成长值 +${lesson.completionReward?.growthValue || 0}。${lesson.completionReward?.message || "小树又长高一点点。"}`;
   renderReadingProgress(lesson.lessonId);
-  updateReadingProgress();
+  updateFinishPanelVisibility();
 }
 
-function startLesson() {
+function continueLastPosition() {
   startStudyTimer();
   window.xiaoWuCourseEngine.startLesson(currentLessonId);
-  renderLesson();
+  const savedScrollY = getSavedScrollY(currentLessonId);
+  if (savedScrollY > 0) {
+    window.scrollTo({ top: savedScrollY, behavior: "smooth" });
+  }
 }
 
 function completeLesson() {
@@ -460,6 +553,6 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") stopStudyTimer();
 });
 window.addEventListener("beforeunload", stopStudyTimer);
-courseStartButton.addEventListener("click", startLesson);
+courseStartButton.addEventListener("click", continueLastPosition);
 courseCompleteButton.addEventListener("click", completeLesson);
 lessonFinishButton.addEventListener("click", completeLesson);

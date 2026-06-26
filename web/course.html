@@ -9,10 +9,14 @@
   <body>
     <main class="app-shell lesson-page-shell">
       <header class="hero lesson-hero">
-        <p class="eyebrow">XiaoWu Video Lesson</p>
-        <h1>小吴课堂</h1>
-        <p class="subtitle">一节课只认真学一个视频。小7慢慢看，小吴陪你把重点留下来。</p>
-        <a class="back-link" href="index.html">← 回到学习驾驶舱</a>
+        <a class="back-link" href="index.html">← 返回首页</a>
+        <p class="eyebrow">🌸 小吴课堂</p>
+        <h1 id="lessonPageTitle">Lesson001</h1>
+        <p class="subtitle" id="lessonPageSubtitle">免許・欠格事由・営業保証金・保証協会</p>
+        <div class="lesson-hero-meta">
+          <span id="lessonPageTime">预计 35分钟</span>
+          <span id="lessonPageProgress">阅读进度 0%</span>
+        </div>
       </header>
 
       <section class="card course-card" id="courseCard">
@@ -44,8 +48,8 @@
         </div>
 
         <div class="course-actions">
-          <button class="primary-button" id="courseStartButton" type="button">开始本课学习</button>
-          <button class="secondary-button" id="courseCompleteButton" type="button">完成这一课 🌿</button>
+          <button class="secondary-button hidden" id="courseStartButton" type="button">继续上次位置</button>
+          <button class="secondary-button hidden" id="courseCompleteButton" type="button">完成这一课 🌿</button>
         </div>
 
         <div class="course-lesson" id="courseLesson">
@@ -110,6 +114,12 @@
             <span>🎉 Lesson001 完成！</span>
             <p id="lessonFinishStats"></p>
             <button class="primary-button" id="lessonFinishButton" type="button">完成今天学习 🌸</button>
+            <div class="next-lesson-preview">
+              <span>下一堂小吴课堂：</span>
+              <strong>Lesson002｜待生成</strong>
+              <p>Lesson002 将由下一个 LEC 视频字幕生成。现在还没有内容。</p>
+              <button class="secondary-button" type="button" disabled>暂不可用</button>
+            </div>
           </div>
 
           <p class="course-reward" id="courseReward"></p>

@@ -450,6 +450,27 @@ h2 {
   font-weight: 900;
 }
 
+.lesson-hero .back-link {
+  margin: 0 0 14px;
+}
+
+.lesson-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.lesson-hero-meta span {
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
 .course-list {
   display: grid;
   gap: 8px;
@@ -679,6 +700,38 @@ h2 {
 
 .chapter-checkpoint span {
   font-size: 1.4rem;
+}
+
+.chapter-checkpoint.completed {
+  background: #eef8ed;
+  border-color: #bddfba;
+}
+
+.next-lesson-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #fffdf8;
+  border: 1px solid #eadfc7;
+  border-radius: 8px;
+}
+
+.next-lesson-preview span {
+  color: #6f6043;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.next-lesson-preview strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.next-lesson-preview p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 760;
 }
 
 .course-sentence {
