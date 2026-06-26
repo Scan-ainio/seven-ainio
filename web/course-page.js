@@ -447,6 +447,10 @@ function loadCurrentLesson() {
   currentLesson = window.xiaoWuCourseEngine.getLesson(currentLessonId) || window.xiaoWuCourseEngine.getLesson("lesson-001");
   if (!currentLesson) return;
   currentLessonId = currentLesson.lessonId;
+  if (new URLSearchParams(window.location.search).get("start") === "1") {
+    startStudyTimer();
+    window.xiaoWuCourseEngine.startLesson(currentLessonId);
+  }
   renderLesson();
 }
 

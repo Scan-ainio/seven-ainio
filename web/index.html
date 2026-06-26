@@ -98,49 +98,57 @@
 
       <section class="card today-task brain-card" id="brainCard">
         <div class="section-heading">
-          <p class="eyebrow">小吴大脑</p>
-          <h2>🌸 小吴今天陪你完成</h2>
+          <p class="eyebrow">🌸 今日学习计划</p>
+          <h2>🌸 小吴今天陪小7完成</h2>
         </div>
 
         <div class="brain-summary">
           <div>
-            <span>今天的小目标</span>
-            <strong id="brainGoal">小吴正在生成今天的小目标...</strong>
+            <span>今日课堂</span>
+            <strong id="brainGoal">Lesson001｜免許・欠格事由・営業保証金・保証協会</strong>
+            <p class="lesson-progress-note" id="lessonProgressNote">小吴正在确认今天的课堂进度...</p>
           </div>
           <div>
-            <span>预计学习时间</span>
-            <strong id="brainTime">--</strong>
+            <span>预计</span>
+            <strong id="brainTime">35分钟左右</strong>
+          </div>
+          <div>
+            <span>成长树</span>
+            <strong id="brainTreeReward">学完 +5</strong>
           </div>
         </div>
 
-        <div class="brain-block">
-          <h3>今日任务清单</h3>
-          <div class="brain-task-list" id="brainTaskList"></div>
-        </div>
-
-        <div class="brain-two-col">
-          <div class="brain-note">
-            <span>今天先学什么</span>
-            <p id="brainFirstFocus"></p>
+        <details class="brain-plan-details">
+          <summary>▼ 查看今天安排</summary>
+          <div class="brain-block">
+            <h3>今日任务清单</h3>
+            <div class="brain-task-list" id="brainTaskList"></div>
           </div>
-          <div class="brain-note">
-            <span>今天不用学什么</span>
-            <p id="brainSkip"></p>
-          </div>
-        </div>
 
-        <div class="brain-reason">
-          <span>小吴为什么这样安排</span>
-          <p id="brainReason"></p>
-        </div>
+          <div class="brain-two-col">
+            <div class="brain-note">
+              <span>今天不用学什么</span>
+              <p id="brainSkip"></p>
+            </div>
+            <div class="brain-note">
+              <span>今天先学什么</span>
+              <p id="brainFirstFocus"></p>
+            </div>
+          </div>
+
+          <div class="brain-reason">
+            <span>小吴为什么这样安排</span>
+            <p id="brainReason"></p>
+          </div>
+        </details>
 
         <p class="brain-gentle hidden" id="brainGentleReminder"></p>
         <p class="brain-complete-message hidden" id="brainCompleteMessage"></p>
-        <button class="primary-button" id="startStudyButton" type="button">开始今天的学习</button>
+        <button class="primary-button" id="startStudyButton" type="button">🌸 开始今天的小吴课堂</button>
         <button class="secondary-button" id="completeTodayButton" type="button">今天完成啦 🌸</button>
       </section>
 
-      <section class="card course-card" id="courseCard">
+      <section class="card course-card hidden" id="courseCard">
         <div class="section-heading">
           <p class="eyebrow">Today Lesson</p>
           <h2>🌸 今天的小吴课堂</h2>

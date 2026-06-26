@@ -16,6 +16,8 @@ const brainReason = document.querySelector("#brainReason");
 const brainGentleReminder = document.querySelector("#brainGentleReminder");
 const brainCompleteMessage = document.querySelector("#brainCompleteMessage");
 const completeTodayButton = document.querySelector("#completeTodayButton");
+const lessonProgressNote = document.querySelector("#lessonProgressNote");
+const brainTreeReward = document.querySelector("#brainTreeReward");
 const learningMap = document.querySelector("#learningMap");
 const growthTotalStudy = document.querySelector("#growthTotalStudy");
 const growthTotalAnswers = document.querySelector("#growthTotalAnswers");
@@ -237,8 +239,32 @@ function writeStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function getTodayLessonDashboard() {
+  const lessonId = "lesson-001";
+  const lesson = window.xiaoWuCourseEngine?.getLesson(lessonId);
+  const progress = window.xiaoWuCourseEngine?.getLessonProgress(lessonId) || {};
+  const readingProgress = Math.min(100, Math.max(0, Math.round(Number(localStorage.getItem(`${lessonId}-reading-progress`)) || 0)));
+  const lessonLabel = lessonId.replace("lesson-", "Lesson");
+  const title = lesson?.title || "免許・欠格事由・営業保証金・保証協会";
+  const shortTitle = title.replace(" 入门复习", "").replace("・保証協会入门复习", "・保証協会");
+  const reward = 5;
+  const isCompleted = Boolean(progress.isCompleted || progress.completedAt);
+
+  return {
+    lessonId,
+    lessonLabel,
+    title,
+    shortTitle,
+    reward,
+    readingProgress,
+    isCompleted,
+    estimatedMinutes: 35
+  };
+}
+
 function renderBrainPlan() {
   const dashboard = window.xiaoWuBrain.buildDashboard();
+  const todayLesson = getTodayLessonDashboard();
   currentBrainPlan = dashboard.plan;
   daysUntilExamStat.textContent = `${dashboard.daysUntilExam}天`;
   studyPhaseStat.textContent = dashboard.phase;
@@ -250,8 +276,16 @@ function renderBrainPlan() {
   renderCourse(dashboard.course);
   dailyLineText.textContent = dashboard.dailyLine;
   encouragementText.textContent = dashboard.encouragement;
-  brainGoal.textContent = currentBrainPlan.goal;
-  brainTime.textContent = `${currentBrainPlan.estimatedMinutes}分钟左右`;
+  brainGoal.textContent = todayLesson.isCompleted
+    ? "🎉 今天课堂已完成"
+    : `${todayLesson.lessonLabel}｜${todayLesson.shortTitle}`;
+  lessonProgressNote.textContent = todayLesson.isCompleted
+    ? "Lesson001 已完成。小吴建议接着做今日练习，把知识变成分数。"
+    : todayLesson.readingProgress > 0
+      ? `继续学习 ${todayLesson.lessonLabel}，已完成 ${todayLesson.readingProgress}%`
+      : "今天从 Lesson001 开始，小吴陪小7把第一节视频课真正学完。";
+  brainTime.textContent = `${todayLesson.estimatedMinutes}分钟左右`;
+  brainTreeReward.textContent = `学完 +${todayLesson.reward}`;
   brainFirstFocus.textContent = currentBrainPlan.firstFocus;
   brainSkip.textContent = currentBrainPlan.skip;
   brainReason.textContent = currentBrainPlan.reason;
@@ -265,8 +299,15 @@ function renderBrainPlan() {
     brainCompleteMessage.textContent = "小7今天辛苦啦。今天不是只完成了任务，而是又离宅建合格近了一点点。小吴已经帮你记下今天的努力。";
   }
 
+  startStudyButton.textContent = todayLesson.isCompleted ? "去做今日练习" : todayLesson.readingProgress > 0 ? "🌸 继续小吴课堂" : "🌸 开始今天的小吴课堂";
+
   brainTaskList.innerHTML = "";
-  currentBrainPlan.tasks.forEach((task) => {
+  const displayTasks = [
+    { id: "lesson001", text: "学习 Lesson001", done: todayLesson.isCompleted },
+    { id: "practice10", text: "做今日练习 10题", done: false },
+    { id: "mistake10", text: "整理错题 10分钟", done: false }
+  ];
+  displayTasks.forEach((task) => {
     const button = document.createElement("button");
     button.className = `brain-task${task.done ? " done" : ""}`;
     button.type = "button";
@@ -712,6 +753,21 @@ function startCourseLesson() {
     return;
   }
   renderBrainPlan();
+}
+
+function startTodayLesson() {
+  const todayLesson = getTodayLessonDashboard();
+  startStudyTimer();
+
+  if (todayLesson.isCompleted) {
+    setQuestionSource("original");
+    startQuiz();
+    document.querySelector("#quizCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  window.xiaoWuCourseEngine.startLesson(todayLesson.lessonId);
+  window.location.href = `course.html?id=${encodeURIComponent(todayLesson.lessonId)}&start=1`;
 }
 
 function completeCourseLesson() {
@@ -1220,7 +1276,7 @@ renderStudyTime();
 renderMistakeHistory();
 setQuestionSource("original", false);
 window.addEventListener("xiaowu-course-ready", renderBrainPlan);
-startStudyButton.addEventListener("click", startStudyTimer);
+startStudyButton.addEventListener("click", startTodayLesson);
 completeTodayButton.addEventListener("click", completeTodayPlan);
 courseStartButton.addEventListener("click", startCourseLesson);
 courseCompleteButton.addEventListener("click", completeCourseLesson);

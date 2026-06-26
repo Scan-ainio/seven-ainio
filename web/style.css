@@ -206,6 +206,31 @@ h2 {
   margin-top: 14px;
 }
 
+.brain-plan-details {
+  margin-top: 14px;
+  padding: 12px;
+  background: #fffdf8;
+  border: 1px solid #eadfc7;
+  border-radius: 8px;
+}
+
+.brain-plan-details summary {
+  min-height: 42px;
+  display: grid;
+  align-items: center;
+  color: #7d4557;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.lesson-progress-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
 .brain-block h3 {
   margin: 0 0 10px;
   font-size: 1.05rem;
