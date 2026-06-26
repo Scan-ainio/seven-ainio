@@ -581,6 +581,27 @@ h2 {
   font-weight: 900;
 }
 
+.lesson-subsection {
+  padding: 10px 0;
+  border-top: 1px dashed #eadfc7;
+}
+
+.lesson-subsection:first-of-type {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.lesson-subsection h4 {
+  margin-bottom: 6px;
+  color: #2f5f45;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.lesson-subsection p {
+  line-height: 1.75;
+}
+
 .favorite-button {
   min-height: 34px;
   padding: 6px 10px;

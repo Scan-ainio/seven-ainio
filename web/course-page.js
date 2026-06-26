@@ -41,6 +41,8 @@ let studyTimerId = null;
 let lastStudyTick = null;
 let isStudyTiming = false;
 let completedCheckpointIds = new Set();
+let lessonLoadRetryId = null;
+let lessonLoadAttempts = 0;
 
 const lessonSequence = [
   { lessonId: "lesson-001", video: "lesson-001.mp4", status: "ready" },
@@ -303,6 +305,39 @@ function createKnowledgeBlock(lessonId, knowledgeId, paragraph, index) {
   return block;
 }
 
+function createChapterBlock(lessonId, chapter, chapterIndex) {
+  const block = document.createElement("article");
+  block.className = "knowledge-point lesson-chapter-block";
+  block.dataset.knowledgeId = chapter.id || `chapter-${String(chapterIndex + 1).padStart(2, "0")}`;
+
+  const header = document.createElement("div");
+  header.className = "knowledge-point-header";
+  const label = document.createElement("span");
+  label.textContent = chapter.title || getChapterLabel(lessonId, chapterIndex);
+  header.append(label, createFavoriteButton(lessonId, block.dataset.knowledgeId));
+  block.appendChild(header);
+
+  (chapter.subSections || []).forEach((section, sectionIndex) => {
+    const sectionWrap = document.createElement("section");
+    sectionWrap.className = "lesson-subsection";
+    const sectionTitle = document.createElement("h4");
+    sectionTitle.textContent = section.title || `${chapterIndex + 1}-${sectionIndex + 1}`;
+    const sectionText = document.createElement("p");
+    sectionText.textContent = section.text || "";
+    sectionWrap.append(sectionTitle, sectionText);
+    block.appendChild(sectionWrap);
+  });
+
+  if (chapter.body) {
+    const text = document.createElement("p");
+    text.textContent = chapter.body;
+    block.appendChild(text);
+  }
+
+  block.appendChild(createLessonNote(lessonId, block.dataset.knowledgeId));
+  return block;
+}
+
 function createMoodCard(index) {
   const card = document.createElement("div");
   card.className = "lesson-mood-card";
@@ -463,7 +498,8 @@ function renderLesson() {
   if (!lesson) return;
 
   const progress = window.xiaoWuCourseEngine.getLessonProgress(lesson.lessonId);
-  const story = lesson.story || [];
+  const chapters = lesson.chapters || [];
+  const story = chapters.length ? chapters : lesson.story || [];
   const pauseModules = lesson.pauseModules || lessonPauseModules[lesson.lessonId] || [];
   currentLessonId = lesson.lessonId;
   loadCompletedCheckpoints(lesson.lessonId);
@@ -489,12 +525,15 @@ function renderLesson() {
   currentMemoryCardIndex = Math.min(currentMemoryCardIndex, Math.max(0, (lesson.memoryCard || []).length - 1));
 
   courseStory.innerHTML = "";
-  story.forEach((paragraph, index) => {
+  story.forEach((item, index) => {
     const knowledgeId = `kp${String(index + 1).padStart(3, "0")}`;
-    courseStory.appendChild(createKnowledgeBlock(lesson.lessonId, knowledgeId, paragraph, index));
+    const block = chapters.length
+      ? createChapterBlock(lesson.lessonId, item, index)
+      : createKnowledgeBlock(lesson.lessonId, knowledgeId, item, index);
+    courseStory.appendChild(block);
     pauseModules.filter((module) => module.afterIndex === index).forEach((module) => courseStory.appendChild(createPauseModule(module)));
     if ((index + 1) % 4 === 0 && index < story.length - 1) courseStory.appendChild(createMoodCard(index));
-    if (paragraph.startsWith("📖 第") && index < story.length - 1) courseStory.appendChild(createChapterCheckpoint(index));
+    if (index < story.length - 1) courseStory.appendChild(createChapterCheckpoint(index));
   });
 
   courseImportance.textContent = lesson.whyImportant || "";
@@ -539,8 +578,22 @@ function completeLesson() {
 }
 
 function loadCurrentLesson() {
+  console.log("[XiaoWu Course] load attempt", {
+    lessonId: currentLessonId,
+    hasEngine: Boolean(window.xiaoWuCourseEngine),
+    loadedLessons: Object.keys(window.xiaoWuLessons || {})
+  });
+  if (!window.xiaoWuCourseEngine) {
+    scheduleLessonLoadRetry();
+    return;
+  }
   currentLesson = window.xiaoWuCourseEngine.getLesson(currentLessonId) || window.xiaoWuCourseEngine.getLesson("lesson-001");
-  if (!currentLesson) return;
+  if (!currentLesson) {
+    scheduleLessonLoadRetry();
+    return;
+  }
+  if (lessonLoadRetryId) clearTimeout(lessonLoadRetryId);
+  console.log("[XiaoWu Course] lesson loaded", currentLesson.lessonId);
   currentLessonId = currentLesson.lessonId;
   if (new URLSearchParams(window.location.search).get("start") === "1") {
     startStudyTimer();
@@ -549,7 +602,27 @@ function loadCurrentLesson() {
   renderLesson();
 }
 
+function scheduleLessonLoadRetry() {
+  lessonLoadAttempts += 1;
+  if (lessonLoadRetryId) clearTimeout(lessonLoadRetryId);
+
+  if (lessonLoadAttempts > 12) {
+    console.warn("[XiaoWu Course] lesson load failed", {
+      lessonId: currentLessonId,
+      loadedLessons: Object.keys(window.xiaoWuLessons || {})
+    });
+    courseTitle.textContent = "课程暂时没有加载成功，请刷新页面。";
+    courseMeta.textContent = "如果刷新后仍失败，请检查课程文件是否存在。";
+    courseStory.innerHTML = "";
+    return;
+  }
+
+  lessonLoadRetryId = setTimeout(loadCurrentLesson, 250);
+}
+
 window.addEventListener("xiaowu-course-ready", loadCurrentLesson);
+document.addEventListener("DOMContentLoaded", loadCurrentLesson);
+setTimeout(loadCurrentLesson, 0);
 window.addEventListener("scroll", updateReadingProgress, { passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") stopStudyTimer();
