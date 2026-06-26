@@ -11,7 +11,7 @@
       <header class="hero">
         <p class="eyebrow">小吴主页</p>
         <h1>Takken Scan Coach</h1>
-        <p class="companion-message" id="companionMessage">小7，今天 Scan 教导员陪你学习。</p>
+        <p class="companion-message" id="companionMessage"></p>
         <p class="subtitle">今天只完成一个闭环：学习、做题、记录错题、决定明天。</p>
       </header>
 
@@ -28,10 +28,24 @@
           <span>连续学习</span>
           <strong>1天</strong>
         </article>
-        <article class="stat-card">
-          <span>今日学习时间</span>
-          <strong>75分钟</strong>
-        </article>
+      </section>
+
+      <section class="card study-time-card" aria-label="小7的学习时间">
+        <div class="section-heading">
+          <p class="eyebrow">Study Time</p>
+          <h2>⏱ 小7的学习时间</h2>
+        </div>
+        <div class="study-time-grid">
+          <div>
+            <span>今日学习：</span>
+            <strong id="todayStudyTime">0分00秒</strong>
+          </div>
+          <div>
+            <span>累计学习：</span>
+            <strong id="totalStudyTime">0分00秒</strong>
+          </div>
+        </div>
+        <p class="study-time-note">小7的每一分钟努力，小吴都帮你记着。</p>
       </section>
 
       <section class="card today-task">
@@ -48,6 +62,7 @@
           <li>做题 10-15 道</li>
           <li>记录 1-3 道错题</li>
         </ul>
+        <button class="primary-button" id="startStudyButton" type="button">开始今天的学习</button>
       </section>
 
       <section class="card advice">

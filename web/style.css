@@ -251,6 +251,43 @@ textarea:focus {
   margin-bottom: 10px;
 }
 
+.study-time-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fcf8 100%);
+}
+
+.study-time-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.study-time-grid div {
+  padding: 13px;
+  background: #f8faf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.study-time-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.study-time-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.study-time-note {
+  margin: 12px 0 0;
+  color: #7d4557;
+  font-weight: 800;
+}
+
 .hidden {
   display: none !important;
 }
@@ -675,6 +712,10 @@ textarea:focus {
 
   .status-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .study-time-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .source-picker {

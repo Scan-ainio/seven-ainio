@@ -2,6 +2,9 @@ const totalInput = document.querySelector("#totalQuestions");
 const correctInput = document.querySelector("#correctQuestions");
 const scoreBox = document.querySelector("#scoreBox");
 const companionMessage = document.querySelector("#companionMessage");
+const startStudyButton = document.querySelector("#startStudyButton");
+const todayStudyTime = document.querySelector("#todayStudyTime");
+const totalStudyTime = document.querySelector("#totalStudyTime");
 const startQuizButton = document.querySelector("#startQuizButton");
 const quizIntro = document.querySelector("#quizIntro");
 const quizPanel = document.querySelector("#quizPanel");
@@ -50,6 +53,9 @@ let activeQuestionSource = "original";
 let questions = originalQuestions;
 const answerHistoryKey = "takken_answer_history_v1";
 const mistakeHistoryKey = "takken_mistake_history_v1";
+const todayStudyKey = "takken_today_study_seconds_v1";
+const totalStudyKey = "takken_total_study_seconds_v1";
+const studyDateKey = "takken_today_study_date_v1";
 const coachLines = [
   "小7，这题我们慢慢来。",
   "别急，这一题 Scan 陪你拆开理解。",
@@ -74,11 +80,52 @@ const wrongLines = [
   "✨ Scan 教导员现在陪你补上。",
   "💪 考试之前错，比考试当天错幸运得多。"
 ];
+const greetingMessages = {
+  earlyMorning: [
+    "🌞 早安，小7。今天也一起加油，离宅建合格又近一天。",
+    "🌸 小7醒啦？今天的小吴 Coach 已经准备好陪你学习了。",
+    "☀️ 早上的小7最可爱，今天先轻轻拿下一点点知识吧。",
+    "🌷 早安，小7。小吴在旁边，今天我们慢慢开始就好。"
+  ],
+  morning: [
+    "📚 上午好，小7。现在脑子最清醒，适合拿下一个小考点。",
+    "🌷 小7，上午是提分黄金时间，小吴陪你认真学一会儿。",
+    "✨ 今天的小7也要悄悄变厉害一点点。",
+    "🌸 上午的小7很适合刷题，小吴陪你稳稳拿分。"
+  ],
+  noon: [
+    "☕ 小7，中午先休息一下也没关系。吃饱了再继续，小吴不催你。",
+    "🍱 小7，午饭要好好吃。学习很重要，但你更重要。",
+    "🌸 中午啦，先补充能量，下午我们再一起冲刺。",
+    "🍵 小7，中午慢一点也很好。小吴等你恢复能量。"
+  ],
+  afternoon: [
+    "🍵 下午好，小7。现在不是中午啦，小吴陪你稳稳推进一小步。",
+    "🌤 小7，下午容易犯困，我们就做几题热热身。",
+    "📖 下午的小7也很棒，今天再拿下一个小知识点就很赚。",
+    "✨ 下午不用硬撑，小吴陪你把今天该拿的分拿住。"
+  ],
+  evening: [
+    "🌙 晚上好，小7。今天辛苦啦，小吴继续陪你温柔收尾。",
+    "✨ 夜晚适合安静学习，小7慢慢来，小吴一直在。",
+    "❤️ 今天不需要完美，只要比昨天多懂一点点就很好。",
+    "🌷 晚上的小7也很努力，小吴陪你把最后一点点补上。"
+  ],
+  lateNight: [
+    "🌌 小7，这么晚还在努力，小吴有点心疼你。学一点就早点休息。",
+    "💤 深夜模式开启：今天别硬撑，做两题就去睡觉也很棒。",
+    "🌙 小7乖，太晚了不要逼自己。小吴希望你考过，也希望你好好休息。",
+    "❤️ 深夜的小7已经很努力了。小吴陪你收个尾，然后早点睡。"
+  ]
+};
 
 let currentIndex = 0;
 let selectedAnswer = "";
 let correctCount = 0;
 let answered = false;
+let studyTimerId = null;
+let lastStudyTick = null;
+let isStudyTiming = false;
 
 function readStorage(key) {
   try {
@@ -90,6 +137,103 @@ function readStorage(key) {
 
 function writeStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function readNumberStorage(key) {
+  const value = Number(localStorage.getItem(key));
+
+  return Number.isFinite(value) ? value : 0;
+}
+
+function writeNumberStorage(key, value) {
+  localStorage.setItem(key, String(Math.max(0, Math.floor(value))));
+}
+
+function ensureStudyDate() {
+  const today = getTodayKey();
+  const savedDate = localStorage.getItem(studyDateKey);
+
+  if (savedDate !== today) {
+    localStorage.setItem(studyDateKey, today);
+    writeNumberStorage(todayStudyKey, 0);
+  }
+}
+
+function formatStudyTime(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}小时${String(minutes).padStart(2, "0")}分`;
+  }
+
+  return `${minutes}分${String(remainingSeconds).padStart(2, "0")}秒`;
+}
+
+function renderStudyTime() {
+  ensureStudyDate();
+  todayStudyTime.textContent = formatStudyTime(readNumberStorage(todayStudyKey));
+  totalStudyTime.textContent = formatStudyTime(readNumberStorage(totalStudyKey));
+}
+
+function saveStudyDelta() {
+  if (!isStudyTiming || !lastStudyTick) return;
+
+  const now = Date.now();
+  const deltaSeconds = Math.floor((now - lastStudyTick) / 1000);
+
+  if (deltaSeconds > 0) {
+    ensureStudyDate();
+    writeNumberStorage(todayStudyKey, readNumberStorage(todayStudyKey) + deltaSeconds);
+    writeNumberStorage(totalStudyKey, readNumberStorage(totalStudyKey) + deltaSeconds);
+    lastStudyTick += deltaSeconds * 1000;
+    renderStudyTime();
+  }
+}
+
+function stopStudyTimer() {
+  saveStudyDelta();
+  isStudyTiming = false;
+  lastStudyTick = null;
+
+  if (studyTimerId) {
+    clearInterval(studyTimerId);
+    studyTimerId = null;
+  }
+}
+
+function startStudyTimer() {
+  ensureStudyDate();
+
+  if (document.visibilityState !== "visible") {
+    renderStudyTime();
+    return;
+  }
+
+  if (isStudyTiming) {
+    renderStudyTime();
+    return;
+  }
+
+  isStudyTiming = true;
+  lastStudyTick = Date.now();
+
+  if (!studyTimerId) {
+    studyTimerId = setInterval(saveStudyDelta, 1000);
+  }
+
+  renderStudyTime();
 }
 
 function updateScoreAdvice() {
@@ -119,21 +263,33 @@ function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function setCompanionGreeting() {
-  const hour = new Date().getHours();
+function getGreetingMessagesByHour(hour) {
+  let messages = greetingMessages.lateNight;
 
-  if (hour < 11) {
-    companionMessage.textContent = "🌞 早安，小7。今天也一起加油，离宅建合格又近一天。";
-    return;
+  if (hour >= 5 && hour <= 8) {
+    messages = greetingMessages.earlyMorning;
+  } else if (hour >= 9 && hour <= 11) {
+    messages = greetingMessages.morning;
+  } else if (hour >= 12 && hour <= 13) {
+    messages = greetingMessages.noon;
+  } else if (hour >= 14 && hour <= 17) {
+    messages = greetingMessages.afternoon;
+  } else if (hour >= 18 && hour <= 21) {
+    messages = greetingMessages.evening;
   }
 
-  if (hour < 17) {
-    companionMessage.textContent = "☕ 小7，中午别忘了休息一下。下午继续努力，我们一起冲刺。";
-    return;
-  }
-
-  companionMessage.textContent = "🌙 晚上好，小7。今天 Scan 教导员继续陪你学习。";
+  return messages;
 }
+
+function setCompanionGreeting(hour = new Date().getHours()) {
+  const messages = getGreetingMessagesByHour(hour);
+  companionMessage.textContent = randomItem(messages);
+}
+
+window.previewXiaoWuGreeting = (hour) => {
+  setCompanionGreeting(hour);
+  return companionMessage.textContent;
+};
 
 function resetQuestionState() {
   selectedAnswer = "";
@@ -174,7 +330,8 @@ function getWrongReasons(question) {
   return question.wrongReasons || question.wrongChoiceExplanations || {};
 }
 
-function setQuestionSource(source) {
+function setQuestionSource(source, shouldStartTimer = true) {
+  if (shouldStartTimer) startStudyTimer();
   activeQuestionSource = source;
   questions = source === "past" ? pastQuestions : originalQuestions;
   originalSourceButton.classList.toggle("active", source === "original");
@@ -315,6 +472,7 @@ function saveAnswerRecord(question, isCorrect, scanTeaching) {
 }
 
 function startQuiz() {
+  startStudyTimer();
   currentIndex = 0;
   correctCount = 0;
   quizIntro.classList.add("hidden");
@@ -462,12 +620,24 @@ function toggleMistakePanel() {
 }
 
 setCompanionGreeting();
+renderStudyTime();
 renderMistakeHistory();
-setQuestionSource("original");
-originalSourceButton.addEventListener("click", () => setQuestionSource("original"));
-pastSourceButton.addEventListener("click", () => setQuestionSource("past"));
+setQuestionSource("original", false);
+startStudyButton.addEventListener("click", startStudyTimer);
+originalSourceButton.addEventListener("click", () => {
+  setQuestionSource("original");
+});
+pastSourceButton.addEventListener("click", () => {
+  setQuestionSource("past");
+});
 startQuizButton.addEventListener("click", startQuiz);
 submitAnswerButton.addEventListener("click", submitAnswer);
 nextQuestionButton.addEventListener("click", goNextQuestion);
 restartQuizButton.addEventListener("click", startQuiz);
 toggleMistakesButton.addEventListener("click", toggleMistakePanel);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    stopStudyTimer();
+  }
+});
+window.addEventListener("beforeunload", stopStudyTimer);
