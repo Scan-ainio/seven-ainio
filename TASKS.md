@@ -20,18 +20,18 @@
 - [x] 创建 `glossary/terms-main.md`：核心术语表。
 - [ ] 创建第 1 周学习计划。
 
-## 第四阶段：AI 学习引擎核心模板
+## 第四阶段：小吴 Coach 学习引擎核心模板
 
 - [x] 创建 `profiles/student-profile-template.md`：学生档案字段模板。
-- [x] 创建 `daily_logs/daily-coach-template.md`：每日 AI 教练输出模板。
+- [x] 创建 `daily_logs/daily-coach-template.md`：每日小吴 Coach 输出模板。
 - [ ] 基于学生档案生成第一版个人学习档案。
 - [ ] 基于每日教练模板生成今天的学习安排。
 
 ## MVP 阶段：当天可用学习闭环
 
-- [x] 创建 `AI_RULES.md`：AI 宅建教练核心决策规则。
+- [x] 创建 `XIAOWU_RULES.md`：小吴 Coach 核心决策规则。
 - [x] 创建 `daily_logs/2026-06-25-day-1.md`：Day 1 学习计划。
-- [x] 创建 `web/` 静态 MVP Dashboard。
+- [x] 创建 `web/` 静态 MVP 小吴主页。
 - [x] 创建手机做题系统与小7陪学模式。
 - [x] 增加 localStorage 错题历史记录与错题回顾。
 - [x] 完成官方过去问导入第一版。
