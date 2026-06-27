@@ -52,7 +52,7 @@ let lessonLoadAttempts = 0;
 
 const lessonSequence = [
   { lessonId: "lesson-001", title: "为什么免許题总是做错？", status: "ready" },
-  { lessonId: "lesson-002", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-002", title: "为什么总把这些制度搞混？", status: "ready" },
   { lessonId: "lesson-003", title: "小吴准备中", status: "pending" },
   { lessonId: "lesson-004", title: "小吴准备中", status: "pending" },
   { lessonId: "lesson-005", title: "小吴准备中", status: "pending" },
@@ -547,7 +547,7 @@ function renderNextLesson() {
     : `${label}｜小吴正在准备中 🌸`;
   nextLessonText.textContent = open
     ? "小7，下一堂课已经准备好啦。休息一下，再继续也可以。"
-    : "小7，下一堂课小吴还在整理。今天先把 Lesson001 稳稳吃透。不用急，树不是一天长大的，但每天都会长高一点点。";
+    : `小7，下一堂课小吴还在整理。今天先把 ${lessonDisplayLabel(currentLessonId)} 稳稳吃透。不用急，树不是一天长大的，但每天都会长高一点点。`;
   nextLessonButton.textContent = open ? `进入 ${label} 小吴课堂` : "🌸 明天再来看看";
   nextLessonButton.disabled = !open;
   nextLessonButton.onclick = open ? () => {
