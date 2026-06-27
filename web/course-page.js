@@ -28,6 +28,12 @@ const courseReward = document.querySelector("#courseReward");
 const lessonFinishPanel = document.querySelector("#lessonFinishPanel");
 const lessonFinishStats = document.querySelector("#lessonFinishStats");
 const lessonFinishButton = document.querySelector("#lessonFinishButton");
+const courseCatalogToggle = document.querySelector("#courseCatalogToggle");
+const courseCatalogPanel = document.querySelector("#courseCatalogPanel");
+const courseCatalogList = document.querySelector("#courseCatalogList");
+const nextLessonTitle = document.querySelector("#nextLessonTitle");
+const nextLessonText = document.querySelector("#nextLessonText");
+const nextLessonButton = document.querySelector("#nextLessonButton");
 
 const todayStudyKey = "takken_today_study_seconds_v1";
 const totalStudyKey = "takken_total_study_seconds_v1";
@@ -45,9 +51,13 @@ let lessonLoadRetryId = null;
 let lessonLoadAttempts = 0;
 
 const lessonSequence = [
-  { lessonId: "lesson-001", video: "lesson-001.mp4", status: "ready" },
-  { lessonId: "lesson-002", video: "lesson-002.mp4", status: "pending" },
-  { lessonId: "lesson-003", video: "lesson-003.mp4", status: "pending" }
+  { lessonId: "lesson-001", title: "为什么免許题总是做错？", status: "ready" },
+  { lessonId: "lesson-002", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-003", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-004", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-005", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-006", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-007", title: "小吴准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
@@ -493,6 +503,58 @@ function renderMemoryCarousel(lesson) {
   courseMemoryCard.appendChild(wrap);
 }
 
+function lessonDisplayLabel(lessonId) {
+  return lessonId.replace("lesson-", "Lesson");
+}
+
+function isLessonOpen(lessonId) {
+  const sequenceItem = lessonSequence.find((item) => item.lessonId === lessonId);
+  return sequenceItem?.status === "ready" && Boolean(window.xiaoWuCourseEngine?.getLesson(lessonId));
+}
+
+function renderCourseCatalog() {
+  if (!courseCatalogList) return;
+  courseCatalogList.innerHTML = "";
+
+  lessonSequence.forEach((item) => {
+    const label = lessonDisplayLabel(item.lessonId);
+    const lesson = window.xiaoWuCourseEngine?.getLesson(item.lessonId);
+    const open = isLessonOpen(item.lessonId);
+    const row = document.createElement(open ? "a" : "div");
+    row.className = `course-catalog-item${open ? " available" : " locked"}${item.lessonId === currentLessonId ? " current" : ""}`;
+
+    if (open) {
+      row.href = `course.html?id=${item.lessonId}`;
+      row.textContent = `${label}｜${lesson?.intro?.title || item.title}`;
+    } else {
+      row.innerHTML = `<span>${label}｜即将开放</span><em>小吴准备中</em>`;
+    }
+
+    courseCatalogList.appendChild(row);
+  });
+}
+
+function renderNextLesson() {
+  if (!nextLessonTitle || !nextLessonButton) return;
+  const currentIndex = lessonSequence.findIndex((item) => item.lessonId === currentLessonId);
+  const next = lessonSequence[currentIndex + 1] || { lessonId: "lesson-002", status: "pending" };
+  const label = lessonDisplayLabel(next.lessonId);
+  const open = isLessonOpen(next.lessonId);
+  const nextLesson = window.xiaoWuCourseEngine?.getLesson(next.lessonId);
+
+  nextLessonTitle.textContent = open
+    ? `${label}｜${nextLesson?.intro?.title || next.title || "小吴课堂"}`
+    : `${label}｜小吴正在准备中 🌸`;
+  nextLessonText.textContent = open
+    ? "小7，下一堂课已经准备好啦。休息一下，再继续也可以。"
+    : "小7，下一堂课小吴还在整理。今天先把 Lesson001 稳稳吃透。不用急，树不是一天长大的，但每天都会长高一点点。";
+  nextLessonButton.textContent = open ? `进入 ${label} 小吴课堂` : "🌸 明天再来看看";
+  nextLessonButton.disabled = !open;
+  nextLessonButton.onclick = open ? () => {
+    window.location.href = `course.html?id=${next.lessonId}`;
+  } : null;
+}
+
 function renderLesson() {
   const lesson = currentLesson;
   if (!lesson) return;
@@ -505,17 +567,18 @@ function renderLesson() {
   loadCompletedCheckpoints(lesson.lessonId);
   const savedProgress = getReadingProgressValue(lesson.lessonId);
   const savedScrollY = getSavedScrollY(lesson.lessonId);
-  const lessonLabel = lesson.lessonId.replace("lesson-", "Lesson");
+  const lessonLabel = lessonDisplayLabel(lesson.lessonId);
   const cleanTitle = lesson.intro?.subtitle || lesson.title.replace(" 入门复习", "").replace("・保証協会入门复习", "・保証協会");
 
-  lessonPageTitle.textContent = lessonLabel;
+  lessonPageTitle.textContent = lesson.title || lessonLabel;
   lessonPageSubtitle.textContent = cleanTitle;
-  lessonPageTime.textContent = "预计 35分钟";
+  lessonPageTime.textContent = `预计${lesson.estimatedMinutes || 35}分钟`;
   lessonPageProgress.textContent = `阅读进度 ${savedProgress}%`;
   courseLessonLabel.textContent = lessonLabel;
   courseTitle.textContent = lesson.title;
-  courseMeta.textContent = `${lesson.subject} / 预计35分钟 / LEC 视频课体系`;
+  courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes || 35}分钟 / 小吴课堂`;
   courseProgressBadge.textContent = `${progress.percent}%`;
+  courseProgressBadge.classList.toggle("hidden", !courseProgressBadge.textContent.trim());
   courseProgressBar.style.width = `${progress.percent}%`;
   courseStartButton.textContent = "继续上次位置";
   courseStartButton.classList.toggle("hidden", savedProgress <= 0 || savedScrollY <= 0 || progress.isCompleted);
@@ -559,6 +622,8 @@ function renderLesson() {
   lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：课堂章节 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
   lessonFinishPanel.querySelector("span").textContent = `🎉 ${lessonLabel} 完成！`;
   courseReward.textContent = `${lesson.completionReward?.treeIcon || "🌿"} 完成奖励：成长值 +${lesson.completionReward?.growthValue || 0}。${lesson.completionReward?.message || "小树又长高一点点。"}`;
+  renderCourseCatalog();
+  renderNextLesson();
   renderReadingProgress(lesson.lessonId);
   updateFinishPanelVisibility();
 }
@@ -631,3 +696,6 @@ window.addEventListener("beforeunload", stopStudyTimer);
 courseStartButton.addEventListener("click", continueLastPosition);
 courseCompleteButton.addEventListener("click", completeLesson);
 lessonFinishButton.addEventListener("click", completeLesson);
+courseCatalogToggle?.addEventListener("click", () => {
+  courseCatalogPanel?.classList.toggle("hidden");
+});

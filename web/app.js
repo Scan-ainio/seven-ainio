@@ -283,7 +283,7 @@ function renderBrainPlan() {
     ? "Lesson001 已完成。小吴建议接着做今日练习，把知识变成分数。"
     : todayLesson.readingProgress > 0
       ? `继续学习 ${todayLesson.lessonLabel}，已完成 ${todayLesson.readingProgress}%`
-      : "今天从 Lesson001 开始，小吴陪小7把第一节视频课真正学完。";
+      : "今天从 Lesson001 开始，小吴陪小7把第一堂小吴课堂真正学完。";
   brainTime.textContent = `${todayLesson.estimatedMinutes}分钟左右`;
   brainTreeReward.textContent = `学完 +${todayLesson.reward}`;
   brainFirstFocus.textContent = currentBrainPlan.firstFocus;
@@ -596,7 +596,7 @@ function renderCourse(courseDashboard) {
   currentCourseLessonId = lesson.lessonId;
   if (courseLessonLabel) courseLessonLabel.textContent = lesson.intro?.label || lesson.lessonId.replace("lesson-", "Lesson");
   if (courseTitle) courseTitle.textContent = lesson.title;
-  if (courseMeta) courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes || 35}分钟 / 视频课体系`;
+  if (courseMeta) courseMeta.textContent = `${lesson.subject} / 预计${lesson.estimatedMinutes || 35}分钟 / 小吴课堂`;
   if (courseProgressBadge) courseProgressBadge.textContent = `${progress.percent}%`;
   if (courseProgressBar) courseProgressBar.style.width = `${progress.percent}%`;
   if (courseStartButton) courseStartButton.textContent = `进入 ${lesson.lessonId.replace("lesson-", "Lesson")} 小吴课堂`;

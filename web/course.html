@@ -9,7 +9,10 @@
   <body>
     <main class="app-shell lesson-page-shell">
       <header class="hero lesson-hero">
-        <a class="back-link" href="index.html">← 返回首页</a>
+        <div class="lesson-top-actions">
+          <a class="back-link" href="index.html">← 返回首页</a>
+          <button class="back-link catalog-toggle" id="courseCatalogToggle" type="button">📚 课程目录</button>
+        </div>
         <p class="eyebrow">🌸 小吴课堂</p>
         <h1 id="lessonPageTitle">Lesson001</h1>
         <p class="subtitle" id="lessonPageSubtitle">免許・欠格事由・営業保証金・保証協会</p>
@@ -17,12 +20,19 @@
           <span id="lessonPageTime">预计 35分钟</span>
           <span id="lessonPageProgress">阅读进度 0%</span>
         </div>
+        <div class="course-catalog-panel hidden" id="courseCatalogPanel">
+          <div class="course-catalog-heading">
+            <strong>📚 小吴课堂目录</strong>
+            <span>小7，按顺序慢慢学就好。</span>
+          </div>
+          <div class="course-catalog-list" id="courseCatalogList"></div>
+        </div>
       </header>
 
       <section class="card course-card" id="courseCard">
         <div class="section-heading">
-          <p class="eyebrow">Video Lesson</p>
-          <h2>📚 小吴视频课</h2>
+          <p class="eyebrow">XiaoWu Lesson</p>
+          <h2>📚 小吴课堂</h2>
         </div>
 
         <div class="course-cover">
@@ -116,9 +126,9 @@
             <button class="primary-button" id="lessonFinishButton" type="button">完成今天学习 🌸</button>
             <div class="next-lesson-preview">
               <span>下一堂小吴课堂：</span>
-              <strong>Lesson002｜待生成</strong>
-              <p>Lesson002 将由下一个 LEC 视频字幕生成。现在还没有内容。</p>
-              <button class="secondary-button" type="button" disabled>暂不可用</button>
+              <strong id="nextLessonTitle">Lesson002｜小吴正在准备中 🌸</strong>
+              <p id="nextLessonText">小7，下一堂课小吴还在整理。今天先把 Lesson001 稳稳吃透。不用急，树不是一天长大的，但每天都会长高一点点。</p>
+              <button class="secondary-button" id="nextLessonButton" type="button" disabled>🌸 明天再来看看</button>
             </div>
           </div>
 
