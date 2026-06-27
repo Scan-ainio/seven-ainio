@@ -53,9 +53,9 @@ let lessonLoadAttempts = 0;
 const lessonSequence = [
   { lessonId: "lesson-001", title: "为什么免許题总是做错？", status: "ready" },
   { lessonId: "lesson-002", title: "为什么总把这些制度搞混？", status: "ready" },
-  { lessonId: "lesson-003", title: "小吴准备中", status: "pending" },
-  { lessonId: "lesson-004", title: "小吴准备中", status: "pending" },
-  { lessonId: "lesson-005", title: "小吴准备中", status: "pending" },
+  { lessonId: "lesson-003", title: "案内所题为什么总绕晕人？", status: "ready" },
+  { lessonId: "lesson-004", title: "这些证件为什么总会认错？", status: "ready" },
+  { lessonId: "lesson-005", title: "民法不是靠背出来的", status: "ready" },
   { lessonId: "lesson-006", title: "小吴准备中", status: "pending" },
   { lessonId: "lesson-007", title: "小吴准备中", status: "pending" }
 ];

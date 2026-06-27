@@ -53,7 +53,7 @@ window.xiaoWuCourseEngine = (() => {
 
     files.forEach((file) => {
       const script = document.createElement("script");
-      script.src = file;
+      script.src = `${file}?v=20260627-lesson005`;
       script.onload = finish;
       script.onerror = finish;
       document.head.appendChild(script);
