@@ -60,7 +60,8 @@ const lessonSequence = [
   { lessonId: "lesson-007", title: "为什么不法行為总觉得很乱？其实只要记住这5张图。", status: "ready" },
   { lessonId: "lesson-008", title: "契約不適合責任，为什么越学越绕？", status: "ready" },
   { lessonId: "lesson-009", title: "建物为什么不用追求满分？", status: "ready" },
-  { lessonId: "lesson-010", title: "小吴正在准备中", status: "pending" }
+  { lessonId: "lesson-010", title: "土地题为什么也不用死背？", status: "ready" },
+  { lessonId: "lesson-011", title: "小吴正在准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
