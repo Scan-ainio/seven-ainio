@@ -58,7 +58,9 @@ const lessonSequence = [
   { lessonId: "lesson-005", title: "民法不是靠背出来的", status: "ready" },
   { lessonId: "lesson-006", title: "继承和共有，为什么一算就乱？", status: "ready" },
   { lessonId: "lesson-007", title: "为什么不法行為总觉得很乱？其实只要记住这5张图。", status: "ready" },
-  { lessonId: "lesson-008", title: "小吴正在准备中", status: "pending" }
+  { lessonId: "lesson-008", title: "契約不適合責任，为什么越学越绕？", status: "ready" },
+  { lessonId: "lesson-009", title: "建物为什么不用追求满分？", status: "ready" },
+  { lessonId: "lesson-010", title: "小吴正在准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
