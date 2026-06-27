@@ -62,11 +62,11 @@ window.xiaoWuCourseIndex = [
   {
     "lessonId": "lesson-006",
     "order": 6,
-    "title": "重要事項説明",
-    "subject": "宅建業法",
-    "chapter": "契約前の説明",
-    "estimatedMinutes": 35,
-    "difficulty": "标准",
+    "title": "继承和共有，为什么一算就乱？",
+    "subject": "権利関係",
+    "chapter": "相続・共有",
+    "estimatedMinutes": 60,
+    "difficulty": "进阶",
     "importance": "★★★★★",
     "status": "available",
     "lessonFile": "course/lesson-006.js"
@@ -74,11 +74,11 @@ window.xiaoWuCourseIndex = [
   {
     "lessonId": "lesson-007",
     "order": 7,
-    "title": "35条書面",
-    "subject": "宅建業法",
-    "chapter": "契約前の説明",
-    "estimatedMinutes": 30,
-    "difficulty": "标准",
+    "title": "为什么不法行為总觉得很乱？其实只要记住这5张图。",
+    "subject": "権利関係",
+    "chapter": "不法行為・相続入門",
+    "estimatedMinutes": 60,
+    "difficulty": "进阶",
     "importance": "★★★★★",
     "status": "available",
     "lessonFile": "course/lesson-007.js"
