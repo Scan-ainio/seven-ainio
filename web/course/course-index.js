@@ -122,12 +122,12 @@ window.xiaoWuCourseIndex = [
   {
     "lessonId": "lesson-011",
     "order": 11,
-    "title": "業務上の規制",
-    "subject": "宅建業法",
-    "chapter": "営業中のルール",
-    "estimatedMinutes": 30,
+    "title": "广告有没有骗人？景品表示法这样学就够了",
+    "subject": "税・その他",
+    "chapter": "景品表示法",
+    "estimatedMinutes": 45,
     "difficulty": "标准",
-    "importance": "★★★★★",
+    "importance": "★★★★",
     "status": "available",
     "lessonFile": "course/lesson-011.js"
   },
