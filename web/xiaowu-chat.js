@@ -42,6 +42,7 @@
   let currentAudioUrl = "";
   let pendingPlayback = null;
   let selectedVoiceURI = localStorage.getItem(voiceChoiceKey) || "auto-male";
+  let pageScrollBeforeChat = 0;
 
   function readRecords() {
     try {
@@ -400,7 +401,7 @@
     const root = createElement("div", "xiaowu-chat-root");
     root.innerHTML = `
       <button class="xiaowu-chat-fab" id="xiaowuChatFab" type="button" aria-haspopup="dialog" aria-expanded="false">🌸 问小吴老师</button>
-      <section class="xiaowu-chat-window hidden" id="xiaowuChatWindow" role="dialog" aria-label="小吴老师问答窗口">
+      <section class="xiaowu-chat-window hidden" id="xiaowuChatWindow" role="dialog" aria-modal="true" aria-label="小吴老师问答窗口">
         <header class="xiaowu-chat-header">
           <div>
             <strong>🌸 小吴老师</strong>
@@ -413,7 +414,7 @@
               <option value="auto-male">男声优先</option>
             </select>
           </label>
-          <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="关闭小吴老师">×</button>
+          <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="退出小吴老师">× 退出</button>
         </header>
         <div class="xiaowu-chat-history" id="xiaowuChatHistory"></div>
         <form class="xiaowu-chat-form" id="xiaowuChatForm">
@@ -444,6 +445,9 @@
 
   function openChat() {
     isOpen = true;
+    pageScrollBeforeChat = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.classList.add("xiaowu-chat-open");
+    document.body.style.top = `-${pageScrollBeforeChat}px`;
     document.querySelector("#xiaowuChatWindow").classList.remove("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "true");
     renderHistory();
@@ -458,9 +462,12 @@
     localStorage.setItem(collapsedKey, "1");
     document.querySelector("#xiaowuChatWindow").classList.add("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "false");
+    document.body.classList.remove("xiaowu-chat-open");
+    document.body.style.top = "";
     stopVoiceInput();
     stopXiaoWuSpeech();
     renderHistory();
+    requestAnimationFrame(() => window.scrollTo(0, pageScrollBeforeChat));
   }
 
   function toggleAutoSpeech() {
