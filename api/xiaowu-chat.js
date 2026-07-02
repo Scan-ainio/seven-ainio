@@ -1,5 +1,5 @@
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_MODEL = "gpt-4o-mini";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 const refusalMessage = `🌸 小7，这个问题超出小吴课堂范围啦。你有任何问题可以向生活中的小吴咨询，大宝子无所不能！
 
@@ -100,6 +100,38 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function toGeminiContents(chatHistory, userMessage, currentLessonId) {
+  const recentHistory = Array.isArray(chatHistory)
+    ? chatHistory.slice(-6).flatMap((item) => {
+      const q = normalizeText(item.question).slice(0, 600);
+      const a = normalizeText(item.answer).slice(0, 900);
+      return q && a ? [
+        { role: "user", parts: [{ text: q }] },
+        { role: "model", parts: [{ text: a }] }
+      ] : [];
+    })
+    : [];
+
+  return [
+    ...recentHistory,
+    {
+      role: "user",
+      parts: [{
+        text: `currentLessonId: ${normalizeText(currentLessonId) || "unknown"}\n\n小7的问题：${userMessage}`
+      }]
+    }
+  ];
+}
+
+function extractGeminiReply(data) {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts
+    .map((part) => normalizeText(part.text))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -132,25 +164,14 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     sendJson(res, 500, {
-      error: "OPENAI_API_KEY is not configured",
-      reply: "🌸 小7，小吴老师现在还没有拿到课堂钥匙。请先在服务器环境变量里设置 OPENAI_API_KEY。"
+      error: "GEMINI_API_KEY is not configured",
+      reply: "小吴老师还没有配置好 API Key 🌸"
     });
     return;
   }
-
-  const recentHistory = Array.isArray(chatHistory)
-    ? chatHistory.slice(-6).flatMap((item) => {
-      const q = normalizeText(item.question).slice(0, 600);
-      const a = normalizeText(item.answer).slice(0, 900);
-      return q && a ? [
-        { role: "user", content: q },
-        { role: "assistant", content: a }
-      ] : [];
-    })
-    : [];
 
   const systemPrompt = `你是「小吴老师」，只负责回答宅建考试相关问题。
 
@@ -179,38 +200,36 @@ ${lessonSummary}
 如果用户问到已完成课程内容，请指出对应 Lesson，并在回答末尾加一行「📖 打开 LessonXXX」。`;
 
   try {
-    const response = await fetch(OPENAI_URL, {
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+    const endpoint = `${GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
-        temperature: 0.5,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...recentHistory,
-          {
-            role: "user",
-            content: `currentLessonId: ${normalizeText(currentLessonId) || "unknown"}\n\n小7的问题：${userMessage}`
-          }
-        ]
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: toGeminiContents(chatHistory, userMessage, currentLessonId),
+        generationConfig: {
+          temperature: 0.5
+        }
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("[xiaowu-chat] OpenAI error", data);
+      console.error("[xiaowu-chat] Gemini error", data);
       sendJson(res, response.status, {
-        error: "OpenAI request failed",
-        reply: "🌸 小7，小吴老师刚才有点连不上课堂。等一下再问我一次，好不好？"
+        error: "Gemini request failed",
+        reply: "🌸 小吴老师现在有点卡住了，请稍后再试。"
       });
       return;
     }
 
-    const reply = data?.choices?.[0]?.message?.content?.trim() || "🌸 小7，这题小吴老师想再确认一下。你可以换个说法再问我一次。";
+    const reply = extractGeminiReply(data) || "🌸 小7，这题小吴老师想再确认一下。你可以换个说法再问我一次。";
     const lessonLinks = detectLessonLinks(`${userMessage}\n${reply}`, normalizeText(currentLessonId));
 
     if (!isLikelyTakkenQuestion(userMessage) && reply !== refusalMessage) {
@@ -231,7 +250,7 @@ ${lessonSummary}
     console.error("[xiaowu-chat] request failed", error);
     sendJson(res, 500, {
       error: "Request failed",
-      reply: "🌸 小7，小吴老师刚才没能连上课堂。请稍后再试一次。"
+      reply: "🌸 小吴老师现在有点卡住了，请稍后再试。"
     });
   }
 };
