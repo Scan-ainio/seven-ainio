@@ -2,6 +2,7 @@
   const storageKey = "takken_xiaowu_teacher_chat_v1";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const apiEndpoint = "/api/xiaowu-chat";
+  const historyEndpoint = "/api/xiaowu-history";
   const maxHistoryForApi = 8;
   const debugPrefix = "[XiaoWu Teacher Chat]";
 
@@ -25,6 +26,8 @@
   let chatRecords = readRecords();
   let expandedIds = new Set();
   let collapsedIds = new Set();
+  let historySyncMessage = "";
+  let isHistoryLoading = false;
 
   function readRecords() {
     try {
@@ -37,6 +40,19 @@
 
   function saveRecords() {
     localStorage.setItem(storageKey, JSON.stringify(chatRecords));
+  }
+
+  function mergeRecords(primaryRecords, secondaryRecords) {
+    const recordsById = new Map();
+    [...primaryRecords, ...secondaryRecords].forEach((record) => {
+      if (!record?.id) return;
+      recordsById.set(record.id, { ...recordsById.get(record.id), ...record });
+    });
+    return Array.from(recordsById.values()).sort((left, right) => {
+      const leftTime = new Date(left.createdAt).getTime() || 0;
+      const rightTime = new Date(right.createdAt).getTime() || 0;
+      return leftTime - rightTime;
+    });
   }
 
   function getCurrentLessonId() {
@@ -67,6 +83,14 @@
 
   function getLatestRecordId() {
     return chatRecords.length ? chatRecords[chatRecords.length - 1].id : "";
+  }
+
+  function getDeviceInfo() {
+    return [
+      navigator.userAgent || "unknown",
+      window.location.pathname || "",
+      window.location.search || ""
+    ].join(" | ").slice(0, 500);
   }
 
   function escapeHtml(text) {
@@ -213,6 +237,7 @@
     document.querySelector("#xiaowuChatWindow").classList.remove("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "true");
     renderHistory();
+    loadServerHistory();
     setTimeout(() => document.querySelector("#xiaowuChatInput")?.focus(), 50);
   }
 
@@ -290,6 +315,7 @@
         lessonLinks: normalizeLessonLinks(data.lessonLinks),
         status: response.ok ? "done" : "error"
       });
+      saveServerRecord({ ...record, answer, lessonLinks: normalizeLessonLinks(data.lessonLinks), status: response.ok ? "done" : "error" });
     } catch (error) {
       console.error(debugPrefix, "fetch failed", {
         url: apiEndpoint,
@@ -300,12 +326,94 @@
         lessonLinks: [],
         status: "error"
       });
+      saveServerRecord({
+        ...record,
+        answer: "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。",
+        lessonLinks: [],
+        status: "error"
+      });
     } finally {
       setSending(false);
       renderHistory();
       expandedIds.add(record.id);
       renderHistory();
       scrollHistoryToBottom();
+    }
+  }
+
+  async function loadServerHistory() {
+    if (isHistoryLoading) return;
+    isHistoryLoading = true;
+    try {
+      console.log(debugPrefix, "history fetch start", { url: historyEndpoint });
+      const response = await fetch(historyEndpoint, {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !Array.isArray(data.records)) {
+        throw new Error(data.message || `History request failed with ${response.status}`);
+      }
+
+      chatRecords = mergeRecords(readRecords(), data.records);
+      historySyncMessage = "";
+      saveRecords();
+      renderHistory();
+      scrollHistoryToBottom();
+      console.log(debugPrefix, "history fetch complete", {
+        url: historyEndpoint,
+        status: response.status,
+        records: data.records.length
+      });
+    } catch (error) {
+      console.error(debugPrefix, "history fetch failed", {
+        url: historyEndpoint,
+        error
+      });
+      historySyncMessage = "小吴老师正在同步历史记录 🌸";
+      chatRecords = mergeRecords(chatRecords, readRecords());
+      renderHistory();
+    } finally {
+      isHistoryLoading = false;
+    }
+  }
+
+  async function saveServerRecord(record) {
+    if (!record?.question || !record?.answer) return;
+
+    const payload = {
+      id: record.id,
+      question: record.question,
+      answer: record.answer,
+      lessonLinks: normalizeLessonLinks(record.lessonLinks),
+      createdAt: record.createdAt,
+      lessonId: getCurrentLessonId(),
+      deviceInfo: getDeviceInfo()
+    };
+
+    try {
+      const response = await fetch(historyEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || `History save failed with ${response.status}`);
+      }
+      historySyncMessage = "";
+      console.log(debugPrefix, "history save complete", {
+        url: historyEndpoint,
+        status: response.status
+      });
+    } catch (error) {
+      console.error(debugPrefix, "history save failed", {
+        url: historyEndpoint,
+        error
+      });
+      historySyncMessage = "小吴老师正在同步历史记录 🌸";
+      renderHistory();
     }
   }
 
@@ -341,6 +449,11 @@
     if (!history) return;
     history.innerHTML = "";
     const latestRecordId = getLatestRecordId();
+
+    if (historySyncMessage) {
+      const syncNote = createElement("div", "xiaowu-sync-note", historySyncMessage);
+      history.appendChild(syncNote);
+    }
 
     if (!chatRecords.length) {
       const empty = createElement("div", "xiaowu-chat-empty");

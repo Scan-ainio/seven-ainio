@@ -1904,6 +1904,16 @@ textarea:focus {
   font-weight: 800;
 }
 
+.xiaowu-sync-note {
+  padding: 10px 12px;
+  background: #fff8f2;
+  border: 1px solid #ead7c3;
+  border-radius: 8px;
+  color: #7d4557;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
 .xiaowu-chat-item {
   display: grid;
   gap: 8px;
