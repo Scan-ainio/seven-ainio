@@ -4,6 +4,10 @@
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
+  const ttsEndpoint = "/api/xiaowu-tts";
+  const xiaoWuTtsEngine = "browser";
+  const xiaoWuVoiceName = "male_teacher";
+  const xiaoWuVoiceSpeed = 0.92;
   const maxHistoryForApi = 8;
   const debugPrefix = "[XiaoWu Teacher Chat]";
 
@@ -33,6 +37,9 @@
   let isListening = false;
   let currentlySpeakingId = "";
   let autoSpeechEnabled = localStorage.getItem(autoSpeechKey) !== "0";
+  let currentAudio = null;
+  let currentAudioUrl = "";
+  let pendingPlayback = null;
 
   function readRecords() {
     try {
@@ -236,13 +243,25 @@
       .trim();
   }
 
+  function cleanupCurrentAudio() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      currentAudio = null;
+    }
+    if (currentAudioUrl) {
+      URL.revokeObjectURL(currentAudioUrl);
+      currentAudioUrl = "";
+    }
+  }
+
   function getPreferredSpeechVoice() {
     if (!("speechSynthesis" in window)) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
 
     const languageOrder = ["zh-CN", "zh-TW", "ja-JP", "en-US"];
-    const namePriority = ["Google", "Microsoft", "Kyoko", "Tingting", "Mei-Jia", "Natural"];
+    const namePriority = ["Google", "Microsoft", "Natural", "Premium", "Enhanced", "Kyoko", "Tingting", "Mei-Jia", "Eddy", "Reed", "Grandpa"];
 
     const scored = voices.map((voice) => {
       const langIndex = languageOrder.findIndex((lang) => voice.lang?.toLowerCase().startsWith(lang.toLowerCase()));
@@ -257,7 +276,7 @@
     return scored[0]?.voice || null;
   }
 
-  function speakWithXiaoWuVoice(text, onEnd) {
+  function speakWithBrowserVoice(text, onEnd) {
     if (!("speechSynthesis" in window)) {
       showChatNotice("🌸 小7，这个浏览器暂时不支持朗读，可以先看文字版的小吴老师。");
       if (typeof onEnd === "function") onEnd();
@@ -284,6 +303,76 @@
     };
     window.speechSynthesis.speak(utterance);
     return true;
+  }
+
+  async function speakWithXiaoWuVoice(text, onEnd, options = {}) {
+    const speechText = stripForSpeech(text);
+    if (!speechText) {
+      if (typeof onEnd === "function") onEnd();
+      return false;
+    }
+
+    stopXiaoWuSpeech({ silent: true });
+    if (options.recordId) currentlySpeakingId = options.recordId;
+
+    if (xiaoWuTtsEngine === "browser") {
+      return speakWithBrowserVoice(speechText, onEnd);
+    }
+
+    try {
+      const response = await fetch(ttsEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: speechText,
+          voice: xiaoWuVoiceName,
+          speed: xiaoWuVoiceSpeed
+        })
+      });
+
+      if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
+        throw new Error(`Kokoro TTS failed with ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      currentAudioUrl = URL.createObjectURL(audioBlob);
+      currentAudio = new Audio(currentAudioUrl);
+      currentAudio.preload = "auto";
+      currentAudio.volume = 1;
+      currentAudio.onended = () => {
+        cleanupCurrentAudio();
+        pendingPlayback = null;
+        if (typeof onEnd === "function") onEnd();
+      };
+      currentAudio.onerror = () => {
+        cleanupCurrentAudio();
+        pendingPlayback = null;
+        if (typeof onEnd === "function") onEnd();
+      };
+
+      try {
+        await currentAudio.play();
+        if (options.recordId) currentlySpeakingId = options.recordId;
+        pendingPlayback = null;
+        renderHistory();
+        return true;
+      } catch (playError) {
+        console.warn(debugPrefix, "Kokoro audio autoplay blocked", playError);
+        pendingPlayback = {
+          recordId: options.recordId || "",
+          text,
+          audioUrl: currentAudioUrl
+        };
+        currentlySpeakingId = "";
+        renderHistory();
+        return false;
+      }
+    } catch (error) {
+      console.warn(debugPrefix, "Kokoro TTS unavailable, falling back to SpeechSynthesis", error);
+      cleanupCurrentAudio();
+      pendingPlayback = null;
+      return speakWithBrowserVoice(text, onEnd);
+    }
   }
 
   window.speakWithXiaoWuVoice = speakWithXiaoWuVoice;
@@ -674,20 +763,61 @@
 
   function startAnswerSpeech(recordId, answer) {
     currentlySpeakingId = recordId;
-    const started = speakWithXiaoWuVoice(answer, () => {
+    speakWithXiaoWuVoice(answer, () => {
       currentlySpeakingId = "";
       renderHistory();
-    });
-    if (!started) currentlySpeakingId = "";
+    }, { recordId });
     renderHistory();
   }
 
-  function stopXiaoWuSpeech() {
+  function playPendingXiaoWuSpeech(record) {
+    if (!pendingPlayback?.audioUrl || pendingPlayback.recordId !== record.id) {
+      startAnswerSpeech(record.id, record.answer);
+      return;
+    }
+
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    currentlySpeakingId = "";
+    currentlySpeakingId = record.id;
+    currentAudioUrl = pendingPlayback.audioUrl;
+    if (!currentAudio || currentAudio.src !== currentAudioUrl) {
+      currentAudio = new Audio(currentAudioUrl);
+    }
+    currentAudio.volume = 1;
+    currentAudio.onended = () => {
+      cleanupCurrentAudio();
+      pendingPlayback = null;
+      currentlySpeakingId = "";
+      renderHistory();
+    };
+    currentAudio.onerror = () => {
+      cleanupCurrentAudio();
+      pendingPlayback = null;
+      currentlySpeakingId = "";
+      renderHistory();
+    };
+    currentAudio.play().then(() => {
+      pendingPlayback = null;
+      renderHistory();
+    }).catch((error) => {
+      console.warn(debugPrefix, "manual Kokoro playback failed", error);
+      pendingPlayback = null;
+      currentlySpeakingId = "";
+      speakWithBrowserVoice(record.answer, () => renderHistory());
+      renderHistory();
+    });
     renderHistory();
+  }
+
+  function stopXiaoWuSpeech(options = {}) {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    cleanupCurrentAudio();
+    if (!options.keepPending) pendingPlayback = null;
+    currentlySpeakingId = "";
+    if (!options.silent) renderHistory();
   }
 
   function renderHistory() {
@@ -708,7 +838,7 @@
       return;
     }
 
-    chatRecords.slice().reverse().forEach((record) => {
+    chatRecords.forEach((record) => {
       const expanded = !collapsedIds.has(record.id) && (record.id === latestRecordId || expandedIds.has(record.id));
       const item = createElement("article", `xiaowu-chat-item${expanded ? " expanded" : ""}`);
 
@@ -750,13 +880,20 @@
         answer.appendChild(answerText);
 
         if (record.answer && record.status !== "sending") {
+          const isPendingPlayback = pendingPlayback?.recordId === record.id;
           const speechButton = createElement(
             "button",
             "xiaowu-speech-button",
-            currentlySpeakingId === record.id ? "⏹ 停止" : "🔊 重听"
+            currentlySpeakingId === record.id ? "⏹ 停止" : (isPendingPlayback ? "▶ 播放小吴老师声音" : "🔊 重听")
           );
           speechButton.type = "button";
-          speechButton.addEventListener("click", () => toggleAnswerSpeech(record));
+          speechButton.addEventListener("click", () => {
+            if (isPendingPlayback) {
+              playPendingXiaoWuSpeech(record);
+            } else {
+              toggleAnswerSpeech(record);
+            }
+          });
           answer.appendChild(speechButton);
         }
 
