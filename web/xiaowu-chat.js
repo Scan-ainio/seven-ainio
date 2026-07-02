@@ -24,6 +24,7 @@
   let isSending = false;
   let chatRecords = readRecords();
   let expandedIds = new Set();
+  let collapsedIds = new Set();
 
   function readRecords() {
     try {
@@ -62,6 +63,117 @@
     if (className) element.className = className;
     if (text !== undefined) element.textContent = text;
     return element;
+  }
+
+  function getLatestRecordId() {
+    return chatRecords.length ? chatRecords[chatRecords.length - 1].id : "";
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function renderInlineMarkdown(text) {
+    return escapeHtml(text)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
+
+  function renderMarkdown(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    const html = [];
+    let listOpen = false;
+    let quoteOpen = false;
+    let codeOpen = false;
+
+    const closeList = () => {
+      if (listOpen) {
+        html.push("</ul>");
+        listOpen = false;
+      }
+    };
+    const closeQuote = () => {
+      if (quoteOpen) {
+        html.push("</blockquote>");
+        quoteOpen = false;
+      }
+    };
+
+    lines.forEach((rawLine) => {
+      const line = rawLine.trimEnd();
+
+      if (line.trim().startsWith("```")) {
+        closeList();
+        closeQuote();
+        html.push(codeOpen ? "</code></pre>" : "<pre><code>");
+        codeOpen = !codeOpen;
+        return;
+      }
+
+      if (codeOpen) {
+        html.push(`${escapeHtml(rawLine)}\n`);
+        return;
+      }
+
+      if (!line.trim()) {
+        closeList();
+        closeQuote();
+        return;
+      }
+
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) {
+        closeList();
+        closeQuote();
+        const level = heading[1].length + 3;
+        html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+        return;
+      }
+
+      const quote = line.match(/^>\s?(.+)$/);
+      if (quote) {
+        closeList();
+        if (!quoteOpen) {
+          html.push("<blockquote>");
+          quoteOpen = true;
+        }
+        html.push(`<p>${renderInlineMarkdown(quote[1])}</p>`);
+        return;
+      }
+
+      const bullet = line.match(/^[-*]\s+(.+)$/);
+      if (bullet) {
+        closeQuote();
+        if (!listOpen) {
+          html.push("<ul>");
+          listOpen = true;
+        }
+        html.push(`<li>${renderInlineMarkdown(bullet[1])}</li>`);
+        return;
+      }
+
+      closeList();
+      closeQuote();
+      html.push(`<p>${renderInlineMarkdown(line)}</p>`);
+    });
+
+    closeList();
+    closeQuote();
+    if (codeOpen) html.push("</code></pre>");
+    return html.join("");
+  }
+
+  function scrollHistoryToBottom() {
+    const history = document.querySelector("#xiaowuChatHistory");
+    if (!history) return;
+    requestAnimationFrame(() => {
+      history.scrollTop = history.scrollHeight;
+    });
   }
 
   function buildWidget() {
@@ -107,6 +219,7 @@
   function closeChat() {
     isOpen = false;
     expandedIds = new Set();
+    collapsedIds = new Set();
     localStorage.setItem(collapsedKey, "1");
     document.querySelector("#xiaowuChatWindow").classList.add("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "false");
@@ -138,11 +251,12 @@
     };
 
     chatRecords = [...chatRecords, record];
-    expandedIds.add(record.id);
+    expandedIds = new Set([record.id]);
     saveRecords();
     input.value = "";
     setSending(true);
     renderHistory();
+    scrollHistoryToBottom();
 
     try {
       console.log(debugPrefix, "fetch start", {
@@ -189,6 +303,9 @@
     } finally {
       setSending(false);
       renderHistory();
+      expandedIds.add(record.id);
+      renderHistory();
+      scrollHistoryToBottom();
     }
   }
 
@@ -223,6 +340,7 @@
     const history = document.querySelector("#xiaowuChatHistory");
     if (!history) return;
     history.innerHTML = "";
+    const latestRecordId = getLatestRecordId();
 
     if (!chatRecords.length) {
       const empty = createElement("div", "xiaowu-chat-empty");
@@ -232,30 +350,44 @@
     }
 
     chatRecords.slice().reverse().forEach((record) => {
-      const expanded = expandedIds.has(record.id);
+      const expanded = !collapsedIds.has(record.id) && (record.id === latestRecordId || expandedIds.has(record.id));
       const item = createElement("article", `xiaowu-chat-item${expanded ? " expanded" : ""}`);
 
-      const questionButton = createElement("button", "xiaowu-question-button");
-      questionButton.type = "button";
-      questionButton.innerHTML = `
-        <span class="xiaowu-question-text"></span>
-        <time>${formatTime(record.createdAt)}</time>
-      `;
-      questionButton.querySelector(".xiaowu-question-text").textContent = `小7：${record.question}`;
-      questionButton.addEventListener("click", () => {
-        if (expandedIds.has(record.id)) {
+      const userRow = createElement("div", "xiaowu-message-row user");
+      const userBubble = createElement("div", "xiaowu-message-bubble user");
+      const userMeta = createElement("div", "xiaowu-message-meta");
+      userMeta.innerHTML = `<span>小7</span><time>${formatTime(record.createdAt)}</time>`;
+      const userText = createElement("p", "xiaowu-question-text", record.question);
+      userBubble.appendChild(userMeta);
+      userBubble.appendChild(userText);
+      userRow.appendChild(userBubble);
+      item.appendChild(userRow);
+
+      const toggleButton = createElement("button", "xiaowu-answer-toggle", expanded ? "▼ 收起回答" : "▶ 展开回答");
+      toggleButton.type = "button";
+      toggleButton.addEventListener("click", () => {
+        if (expanded) {
           expandedIds.delete(record.id);
+          collapsedIds.add(record.id);
         } else {
           expandedIds.add(record.id);
+          collapsedIds.delete(record.id);
         }
         renderHistory();
       });
-      item.appendChild(questionButton);
+      item.appendChild(toggleButton);
 
       if (expanded) {
-        const answer = createElement("div", "xiaowu-answer");
-        const answerText = createElement("p");
-        answerText.textContent = record.status === "sending" ? "🌸 小吴老师正在认真想这题..." : record.answer;
+        const answerRow = createElement("div", "xiaowu-message-row teacher");
+        const avatar = createElement("div", "xiaowu-teacher-avatar", "🌸");
+        const answer = createElement("div", "xiaowu-message-bubble teacher");
+        const answerMeta = createElement("div", "xiaowu-message-meta");
+        answerMeta.innerHTML = `<span>小吴老师</span><time>${formatTime(record.createdAt)}</time>`;
+        const answerText = createElement("div", "xiaowu-answer-markdown");
+        answerText.innerHTML = record.status === "sending"
+          ? "<p>🌸 小吴老师正在认真想这题...</p>"
+          : renderMarkdown(record.answer);
+        answer.appendChild(answerMeta);
         answer.appendChild(answerText);
 
         if (record.lessonLinks?.length) {
@@ -269,7 +401,9 @@
           answer.appendChild(links);
         }
 
-        item.appendChild(answer);
+        answerRow.appendChild(avatar);
+        answerRow.appendChild(answer);
+        item.appendChild(answerRow);
       }
 
       history.appendChild(item);
