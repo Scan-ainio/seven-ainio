@@ -1,6 +1,7 @@
 (() => {
   const storageKey = "takken_xiaowu_teacher_chat_v1";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
+  const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
   const maxHistoryForApi = 8;
@@ -31,6 +32,7 @@
   let recognition = null;
   let isListening = false;
   let currentlySpeakingId = "";
+  let autoSpeechEnabled = localStorage.getItem(autoSpeechKey) !== "0";
 
   function readRecords() {
     try {
@@ -222,12 +224,37 @@
       .replace(/```[\s\S]*?```/g, " ")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/[*#>`_~|[\]()]/g, " ")
+      .replace(/[🌸❤️🎉✨⭐💯🌱🌷🎓📚📖✅❌☕🎤🎙️🔊⏹]/g, " ")
       .replace(/^#{1,6}\s+/gm, "")
       .replace(/^[-*]\s+/gm, "")
       .replace(/^>\s?/gm, "")
       .replace(/📖\s*打开\s*Lesson\d+/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/打开\s*Lesson\d+/g, "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
+  }
+
+  function getPreferredSpeechVoice() {
+    if (!("speechSynthesis" in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    const languageOrder = ["zh-CN", "zh-TW", "ja-JP", "en-US"];
+    const namePriority = ["Google", "Microsoft", "Kyoko", "Tingting", "Mei-Jia", "Natural"];
+
+    const scored = voices.map((voice) => {
+      const langIndex = languageOrder.findIndex((lang) => voice.lang?.toLowerCase().startsWith(lang.toLowerCase()));
+      const nameIndex = namePriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
+      return {
+        voice,
+        score: (langIndex === -1 ? 100 : langIndex * 10) + (nameIndex === -1 ? 9 : nameIndex)
+      };
+    });
+
+    scored.sort((left, right) => left.score - right.score);
+    return scored[0]?.voice || null;
   }
 
   function speakWithXiaoWuVoice(text, onEnd) {
@@ -239,9 +266,16 @@
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(stripForSpeech(text));
-    utterance.lang = "zh-CN";
-    utterance.rate = 0.95;
-    utterance.pitch = 1.02;
+    const voice = getPreferredSpeechVoice();
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang || "zh-CN";
+    } else {
+      utterance.lang = "zh-CN";
+    }
+    utterance.rate = 0.88;
+    utterance.pitch = 1.05;
+    utterance.volume = 1;
     utterance.onend = () => {
       if (typeof onEnd === "function") onEnd();
     };
@@ -264,6 +298,7 @@
             <strong>🌸 小吴老师</strong>
             <span>只陪小7学宅建。</span>
           </div>
+          <button class="xiaowu-auto-speech-toggle" id="xiaowuAutoSpeechToggle" type="button" aria-pressed="${autoSpeechEnabled ? "true" : "false"}">${autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关"}</button>
           <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="关闭小吴老师">×</button>
         </header>
         <div class="xiaowu-chat-history" id="xiaowuChatHistory"></div>
@@ -278,6 +313,7 @@
 
     document.querySelector("#xiaowuChatFab").addEventListener("click", openChat);
     document.querySelector("#xiaowuChatClose").addEventListener("click", closeChat);
+    document.querySelector("#xiaowuAutoSpeechToggle").addEventListener("click", toggleAutoSpeech);
     document.querySelector("#xiaowuChatForm").addEventListener("submit", handleSubmit);
     document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
       console.log(debugPrefix, "send button clicked");
@@ -304,7 +340,22 @@
     document.querySelector("#xiaowuChatWindow").classList.add("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "false");
     stopVoiceInput();
+    stopXiaoWuSpeech();
     renderHistory();
+  }
+
+  function toggleAutoSpeech() {
+    autoSpeechEnabled = !autoSpeechEnabled;
+    localStorage.setItem(autoSpeechKey, autoSpeechEnabled ? "1" : "0");
+    updateAutoSpeechToggle();
+    if (!autoSpeechEnabled) stopXiaoWuSpeech();
+  }
+
+  function updateAutoSpeechToggle() {
+    const toggle = document.querySelector("#xiaowuAutoSpeechToggle");
+    if (!toggle) return;
+    toggle.textContent = autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关";
+    toggle.setAttribute("aria-pressed", autoSpeechEnabled ? "true" : "false");
   }
 
   function toggleVoiceInput() {
@@ -474,6 +525,7 @@
         lessonLinks: normalizeLessonLinks(data.lessonLinks),
         status: response.ok ? "done" : "error"
       });
+      maybeAutoSpeak(record.id, answer);
       saveServerRecord({ ...record, answer, lessonLinks: normalizeLessonLinks(data.lessonLinks), status: response.ok ? "done" : "error" });
     } catch (error) {
       console.error(debugPrefix, "fetch failed", {
@@ -485,6 +537,7 @@
         lessonLinks: [],
         status: "error"
       });
+      maybeAutoSpeak(record.id, "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。");
       saveServerRecord({
         ...record,
         answer: "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。",
@@ -607,18 +660,33 @@
     if (!record?.answer || record.status === "sending") return;
 
     if (currentlySpeakingId === record.id && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      currentlySpeakingId = "";
-      renderHistory();
+      stopXiaoWuSpeech();
       return;
     }
 
-    currentlySpeakingId = record.id;
-    const started = speakWithXiaoWuVoice(record.answer, () => {
+    startAnswerSpeech(record.id, record.answer);
+  }
+
+  function maybeAutoSpeak(recordId, answer) {
+    if (!autoSpeechEnabled || !isOpen) return;
+    startAnswerSpeech(recordId, answer);
+  }
+
+  function startAnswerSpeech(recordId, answer) {
+    currentlySpeakingId = recordId;
+    const started = speakWithXiaoWuVoice(answer, () => {
       currentlySpeakingId = "";
       renderHistory();
     });
     if (!started) currentlySpeakingId = "";
+    renderHistory();
+  }
+
+  function stopXiaoWuSpeech() {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    currentlySpeakingId = "";
     renderHistory();
   }
 
@@ -685,7 +753,7 @@
           const speechButton = createElement(
             "button",
             "xiaowu-speech-button",
-            currentlySpeakingId === record.id ? "停止朗读" : "🔊 听小吴老师说"
+            currentlySpeakingId === record.id ? "⏹ 停止" : "🔊 重听"
           );
           speechButton.type = "button";
           speechButton.addEventListener("click", () => toggleAnswerSpeech(record));
