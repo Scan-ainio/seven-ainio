@@ -1,5 +1,6 @@
-const DEFAULT_VOICE = "male_teacher";
+const DEFAULT_VOICE = "zh-CN-YunxiNeural";
 const DEFAULT_SPEED = 0.92;
+const OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -23,29 +24,32 @@ function normalizeText(value, maxLength = 5000) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
-function normalizeSpeed(value) {
-  const speed = Number(value);
-  if (!Number.isFinite(speed)) return Number(process.env.KOKORO_TTS_SPEED) || DEFAULT_SPEED;
-  return Math.min(1.3, Math.max(0.7, speed));
+function escapeXml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
-function decodeBase64Audio(value) {
-  const base64 = String(value || "").replace(/^data:audio\/[a-z0-9.+-]+;base64,/i, "");
-  return Buffer.from(base64, "base64");
+function speedToRate(speedValue) {
+  const speed = Number(speedValue);
+  if (!Number.isFinite(speed)) return "-8%";
+  const percent = Math.round((Math.min(1.3, Math.max(0.7, speed)) - 1) * 100);
+  return `${percent > 0 ? "+" : ""}${percent}%`;
 }
 
-async function fetchAudioFromUrl(url, apiKey) {
-  const response = await fetch(url, {
-    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
-  });
-  if (!response.ok) {
-    throw new Error(`Kokoro audio URL failed with ${response.status}`);
-  }
-  const contentType = response.headers.get("content-type") || "audio/mpeg";
-  return {
-    buffer: Buffer.from(await response.arrayBuffer()),
-    contentType
-  };
+function buildSsml(text, voice, speed) {
+  return [
+    '<speak version="1.0" xml:lang="zh-CN">',
+    `  <voice name="${escapeXml(voice)}">`,
+    `    <prosody rate="${escapeXml(speedToRate(speed))}" pitch="+0%">`,
+    `      ${escapeXml(text)}`,
+    "    </prosody>",
+    "  </voice>",
+    "</speak>"
+  ].join("\n");
 }
 
 module.exports = async function handler(req, res) {
@@ -64,82 +68,61 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const kokoroUrl = process.env.KOKORO_TTS_URL;
-  if (!kokoroUrl) {
-    sendJson(res, 500, { error: "KOKORO_TTS_URL is not configured" });
+  const key = process.env.AZURE_SPEECH_KEY;
+  const region = process.env.AZURE_SPEECH_REGION;
+
+  if (!key || !region) {
+    sendJson(res, 503, {
+      error: "AZURE_SPEECH_NOT_CONFIGURED",
+      message: "Azure Speech 还没有配置好 🌸"
+    });
     return;
   }
 
   const body = parseBody(req);
   const text = normalizeText(body.text);
+
   if (!text) {
     sendJson(res, 400, { error: "text is required" });
     return;
   }
 
-  const apiKey = process.env.KOKORO_TTS_API_KEY || "";
-  const voice = normalizeText(process.env.KOKORO_TTS_VOICE || body.voice || DEFAULT_VOICE, 80);
-  const speed = normalizeSpeed(body.speed);
+  const voice = normalizeText(process.env.AZURE_SPEECH_VOICE || body.voice || DEFAULT_VOICE, 80);
+  const speed = body.speed ?? DEFAULT_SPEED;
+  const endpoint = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
   try {
-    const response = await fetch(kokoroUrl, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
+        "Ocp-Apim-Subscription-Key": key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": OUTPUT_FORMAT,
+        "User-Agent": "xiaowu-teacher"
       },
-      body: JSON.stringify({ text, voice, speed })
+      body: buildSsml(text, voice, speed)
     });
 
-    const contentType = response.headers.get("content-type") || "";
-
     if (!response.ok) {
-      const detail = contentType.includes("application/json")
-        ? await response.json().catch(() => ({}))
-        : await response.text().catch(() => "");
-      console.error("[xiaowu-tts] Kokoro request failed", response.status, detail);
-      sendJson(res, response.status, { error: "Kokoro TTS request failed" });
+      const errorText = await response.text().catch(() => "");
+      console.error("[xiaowu-tts] Azure Speech error", response.status, errorText);
+      sendJson(res, response.status, {
+        error: "Azure Speech request failed",
+        message: "Azure Speech 暂时没有朗读成功 🌸"
+      });
       return;
     }
 
-    if (contentType.startsWith("audio/") || contentType.includes("octet-stream")) {
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-      res.statusCode = 200;
-      res.setHeader("Content-Type", contentType.includes("octet-stream") ? "audio/mpeg" : contentType);
-      res.setHeader("Content-Length", String(audioBuffer.length));
-      res.end(audioBuffer);
-      return;
-    }
-
-    const data = await response.json().catch(() => null);
-    if (!data) {
-      sendJson(res, 502, { error: "Kokoro TTS returned unsupported response" });
-      return;
-    }
-
-    const audioBase64 = data.audio || data.audio_base64 || data.audioContent || data.audio_content;
-    if (audioBase64) {
-      const audioBuffer = decodeBase64Audio(audioBase64);
-      res.statusCode = 200;
-      res.setHeader("Content-Type", data.contentType || data.mimeType || "audio/mpeg");
-      res.setHeader("Content-Length", String(audioBuffer.length));
-      res.end(audioBuffer);
-      return;
-    }
-
-    const audioUrl = data.audioUrl || data.audio_url || data.url;
-    if (audioUrl) {
-      const audio = await fetchAudioFromUrl(audioUrl, apiKey);
-      res.statusCode = 200;
-      res.setHeader("Content-Type", audio.contentType);
-      res.setHeader("Content-Length", String(audio.buffer.length));
-      res.end(audio.buffer);
-      return;
-    }
-
-    sendJson(res, 502, { error: "Kokoro TTS response did not include audio" });
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Length", String(audioBuffer.length));
+    res.end(audioBuffer);
   } catch (error) {
     console.error("[xiaowu-tts] request failed", error);
-    sendJson(res, 500, { error: "Kokoro TTS request failed" });
+    sendJson(res, 500, {
+      error: "Azure Speech request failed",
+      message: "Azure Speech 暂时没有朗读成功 🌸"
+    });
   }
 };

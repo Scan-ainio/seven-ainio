@@ -6,8 +6,8 @@
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
   const ttsEndpoint = "/api/xiaowu-tts";
-  const xiaoWuTtsEngine = "browser";
-  const xiaoWuVoiceName = "male_teacher";
+  const xiaoWuTtsEngine = "azure";
+  const xiaoWuVoiceName = "zh-CN-YunxiNeural";
   const xiaoWuVoiceSpeed = 0.92;
   const maxHistoryForApi = 8;
   const debugPrefix = "[XiaoWu Teacher Chat]";
@@ -350,7 +350,7 @@
       });
 
       if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
-        throw new Error(`Kokoro TTS failed with ${response.status}`);
+        throw new Error(`Azure Speech TTS failed with ${response.status}`);
       }
 
       const audioBlob = await response.blob();
@@ -376,7 +376,7 @@
         renderHistory();
         return true;
       } catch (playError) {
-        console.warn(debugPrefix, "Kokoro audio autoplay blocked", playError);
+        console.warn(debugPrefix, "Azure audio autoplay blocked", playError);
         pendingPlayback = {
           recordId: options.recordId || "",
           text,
@@ -387,7 +387,7 @@
         return false;
       }
     } catch (error) {
-      console.warn(debugPrefix, "Kokoro TTS unavailable, falling back to SpeechSynthesis", error);
+      console.warn(debugPrefix, "Azure Speech unavailable, falling back to SpeechSynthesis", error);
       cleanupCurrentAudio();
       pendingPlayback = null;
       return speakWithBrowserVoice(text, onEnd);
@@ -873,7 +873,7 @@
       pendingPlayback = null;
       renderHistory();
     }).catch((error) => {
-      console.warn(debugPrefix, "manual Kokoro playback failed", error);
+      console.warn(debugPrefix, "manual Azure playback failed", error);
       pendingPlayback = null;
       currentlySpeakingId = "";
       speakWithBrowserVoice(record.answer, () => renderHistory());
