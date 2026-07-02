@@ -2,6 +2,7 @@
   const storageKey = "takken_xiaowu_teacher_chat_v1";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
+  const voiceChoiceKey = "takken_xiaowu_teacher_voice_uri_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
   const ttsEndpoint = "/api/xiaowu-tts";
@@ -40,6 +41,7 @@
   let currentAudio = null;
   let currentAudioUrl = "";
   let pendingPlayback = null;
+  let selectedVoiceURI = localStorage.getItem(voiceChoiceKey) || "auto-male";
 
   function readRecords() {
     try {
@@ -260,15 +262,32 @@
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
 
+    if (selectedVoiceURI && selectedVoiceURI !== "auto-male") {
+      const selected = voices.find((voice) => voice.voiceURI === selectedVoiceURI);
+      if (selected) return selected;
+    }
+
     const languageOrder = ["zh-CN", "zh-TW", "ja-JP", "en-US"];
-    const namePriority = ["Google", "Microsoft", "Natural", "Premium", "Enhanced", "Kyoko", "Tingting", "Mei-Jia", "Eddy", "Reed", "Grandpa"];
+    const malePriority = [
+      "Eddy", "Reed", "Rocko", "Grandpa", "Otoya", "Sinji", "Sin-Ji",
+      "Yunxi", "Yunjian", "Yunyang", "Kangkang", "Danny", "Daniel",
+      "Thomas", "Paul", "Mark", "David", "Microsoft", "Google"
+    ];
+    const naturalPriority = ["Natural", "Premium", "Enhanced", "Neural", "Online"];
+    const femalePenalty = ["Kyoko", "Tingting", "Ting-Ting", "Mei-Jia", "Meijia", "Samantha", "Susan", "Zira", "Hanhan", "Huihui"];
 
     const scored = voices.map((voice) => {
       const langIndex = languageOrder.findIndex((lang) => voice.lang?.toLowerCase().startsWith(lang.toLowerCase()));
-      const nameIndex = namePriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
+      const maleIndex = malePriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
+      const naturalIndex = naturalPriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
+      const femaleIndex = femalePenalty.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
       return {
         voice,
-        score: (langIndex === -1 ? 100 : langIndex * 10) + (nameIndex === -1 ? 9 : nameIndex)
+        score:
+          (maleIndex === -1 ? 40 : maleIndex) +
+          (langIndex === -1 ? 25 : langIndex * 3) +
+          (naturalIndex === -1 ? 8 : naturalIndex) +
+          (femaleIndex === -1 ? 0 : 60)
       };
     });
 
@@ -388,6 +407,12 @@
             <span>只陪小7学宅建。</span>
           </div>
           <button class="xiaowu-auto-speech-toggle" id="xiaowuAutoSpeechToggle" type="button" aria-pressed="${autoSpeechEnabled ? "true" : "false"}">${autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关"}</button>
+          <label class="xiaowu-voice-select-wrap" for="xiaowuVoiceSelect">
+            <span>声音</span>
+            <select id="xiaowuVoiceSelect" aria-label="选择小吴老师声音">
+              <option value="auto-male">男声优先</option>
+            </select>
+          </label>
           <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="关闭小吴老师">×</button>
         </header>
         <div class="xiaowu-chat-history" id="xiaowuChatHistory"></div>
@@ -403,12 +428,17 @@
     document.querySelector("#xiaowuChatFab").addEventListener("click", openChat);
     document.querySelector("#xiaowuChatClose").addEventListener("click", closeChat);
     document.querySelector("#xiaowuAutoSpeechToggle").addEventListener("click", toggleAutoSpeech);
+    document.querySelector("#xiaowuVoiceSelect").addEventListener("change", handleVoiceSelectChange);
     document.querySelector("#xiaowuChatForm").addEventListener("submit", handleSubmit);
     document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
       console.log(debugPrefix, "send button clicked");
     });
     document.querySelector(".xiaowu-voice-button").addEventListener("click", toggleVoiceInput);
     document.querySelector("#xiaowuChatInput").addEventListener("keydown", handleInputKeydown);
+    populateVoiceSelect();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
+    }
     renderHistory();
   }
 
@@ -445,6 +475,48 @@
     if (!toggle) return;
     toggle.textContent = autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关";
     toggle.setAttribute("aria-pressed", autoSpeechEnabled ? "true" : "false");
+  }
+
+  function scoreVoiceForList(voice) {
+    const name = voice.name || "";
+    const maleWords = ["Eddy", "Reed", "Rocko", "Grandpa", "Otoya", "Yunxi", "Yunjian", "Yunyang", "Kangkang", "Danny", "Daniel", "Thomas", "Paul", "Mark", "David"];
+    const naturalWords = ["Natural", "Premium", "Enhanced", "Neural", "Online"];
+    const maleHit = maleWords.some((word) => name.toLowerCase().includes(word.toLowerCase()));
+    const naturalHit = naturalWords.some((word) => name.toLowerCase().includes(word.toLowerCase()));
+    const langScore = voice.lang?.startsWith("zh") ? 0 : voice.lang?.startsWith("ja") ? 1 : voice.lang?.startsWith("en") ? 2 : 3;
+    return (maleHit ? 0 : 20) + langScore + (naturalHit ? 0 : 5);
+  }
+
+  function populateVoiceSelect() {
+    const select = document.querySelector("#xiaowuVoiceSelect");
+    if (!select || !("speechSynthesis" in window)) return;
+
+    const voices = window.speechSynthesis.getVoices();
+    const currentValue = selectedVoiceURI || "auto-male";
+    select.innerHTML = '<option value="auto-male">男声优先</option>';
+
+    voices
+      .slice()
+      .sort((left, right) => scoreVoiceForList(left) - scoreVoiceForList(right))
+      .forEach((voice) => {
+        const option = document.createElement("option");
+        option.value = voice.voiceURI;
+        option.textContent = `${voice.name}｜${voice.lang || "unknown"}`;
+        select.appendChild(option);
+      });
+
+    if ([...select.options].some((option) => option.value === currentValue)) {
+      select.value = currentValue;
+    } else {
+      select.value = "auto-male";
+      selectedVoiceURI = "auto-male";
+    }
+  }
+
+  function handleVoiceSelectChange(event) {
+    selectedVoiceURI = event.target.value || "auto-male";
+    localStorage.setItem(voiceChoiceKey, selectedVoiceURI);
+    stopXiaoWuSpeech();
   }
 
   function toggleVoiceInput() {
