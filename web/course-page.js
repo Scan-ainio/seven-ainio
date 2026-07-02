@@ -62,7 +62,8 @@ const lessonSequence = [
   { lessonId: "lesson-009", title: "建物为什么不用追求满分？", status: "ready" },
   { lessonId: "lesson-010", title: "土地题为什么也不用死背？", status: "ready" },
   { lessonId: "lesson-011", title: "广告有没有骗人？景品表示法这样学就够了", status: "ready" },
-  { lessonId: "lesson-012", title: "小吴正在准备中", status: "pending" }
+  { lessonId: "lesson-012", title: "住宅金融支援機構到底在支援谁？", status: "ready" },
+  { lessonId: "lesson-013", title: "小吴正在准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
@@ -657,7 +658,7 @@ function loadCurrentLesson() {
     scheduleLessonLoadRetry();
     return;
   }
-  currentLesson = window.xiaoWuCourseEngine.getLesson(currentLessonId) || window.xiaoWuCourseEngine.getLesson("lesson-001");
+  currentLesson = window.xiaoWuCourseEngine.getLesson(currentLessonId);
   if (!currentLesson) {
     scheduleLessonLoadRetry();
     return;

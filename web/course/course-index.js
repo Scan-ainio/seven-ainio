@@ -134,12 +134,12 @@ window.xiaoWuCourseIndex = [
   {
     "lessonId": "lesson-012",
     "order": 12,
-    "title": "宅建業法総合復習",
-    "subject": "宅建業法",
-    "chapter": "総合復習",
-    "estimatedMinutes": 35,
-    "difficulty": "复习",
-    "importance": "★★★★★",
+    "title": "住宅金融支援機構到底在支援谁？",
+    "subject": "税・その他",
+    "chapter": "住宅金融支援機構",
+    "estimatedMinutes": 50,
+    "difficulty": "标准",
+    "importance": "★★★★",
     "status": "available",
     "lessonFile": "course/lesson-012.js"
   },
