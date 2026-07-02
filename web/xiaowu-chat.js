@@ -28,6 +28,9 @@
   let collapsedIds = new Set();
   let historySyncMessage = "";
   let isHistoryLoading = false;
+  let recognition = null;
+  let isListening = false;
+  let currentlySpeakingId = "";
 
   function readRecords() {
     try {
@@ -200,6 +203,57 @@
     });
   }
 
+  function getSpeechRecognitionConstructor() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+
+  function getSpeechLanguage() {
+    const language = (navigator.language || "").toLowerCase();
+    return language.startsWith("ja") ? "ja-JP" : "zh-CN";
+  }
+
+  function showChatNotice(message) {
+    historySyncMessage = message;
+    renderHistory();
+  }
+
+  function stripForSpeech(text) {
+    return String(text || "")
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^[-*]\s+/gm, "")
+      .replace(/^>\s?/gm, "")
+      .replace(/📖\s*打开\s*Lesson\d+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function speakWithXiaoWuVoice(text, onEnd) {
+    if (!("speechSynthesis" in window)) {
+      showChatNotice("🌸 小7，这个浏览器暂时不支持朗读，可以先看文字版的小吴老师。");
+      if (typeof onEnd === "function") onEnd();
+      return false;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(stripForSpeech(text));
+    utterance.lang = "zh-CN";
+    utterance.rate = 0.95;
+    utterance.pitch = 1.02;
+    utterance.onend = () => {
+      if (typeof onEnd === "function") onEnd();
+    };
+    utterance.onerror = () => {
+      if (typeof onEnd === "function") onEnd();
+    };
+    window.speechSynthesis.speak(utterance);
+    return true;
+  }
+
+  window.speakWithXiaoWuVoice = speakWithXiaoWuVoice;
+
   function buildWidget() {
     const root = createElement("div", "xiaowu-chat-root");
     root.innerHTML = `
@@ -228,6 +282,7 @@
     document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
       console.log(debugPrefix, "send button clicked");
     });
+    document.querySelector(".xiaowu-voice-button").addEventListener("click", toggleVoiceInput);
     document.querySelector("#xiaowuChatInput").addEventListener("keydown", handleInputKeydown);
     renderHistory();
   }
@@ -248,7 +303,111 @@
     localStorage.setItem(collapsedKey, "1");
     document.querySelector("#xiaowuChatWindow").classList.add("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "false");
+    stopVoiceInput();
     renderHistory();
+  }
+
+  function toggleVoiceInput() {
+    if (isListening) {
+      stopVoiceInput();
+      return;
+    }
+    startVoiceInput();
+  }
+
+  function startVoiceInput() {
+    const Recognition = getSpeechRecognitionConstructor();
+    const voiceButton = document.querySelector(".xiaowu-voice-button");
+    const input = document.querySelector("#xiaowuChatInput");
+
+    if (!Recognition) {
+      showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
+      return;
+    }
+
+    stopVoiceInput();
+    recognition = new Recognition();
+    recognition.lang = getSpeechLanguage();
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    const originalValue = input?.value || "";
+    let finalTranscript = "";
+
+    recognition.onstart = () => {
+      isListening = true;
+      if (voiceButton) {
+        voiceButton.classList.add("listening");
+        voiceButton.textContent = "🎙️ 正在听小7说话……";
+        voiceButton.setAttribute("aria-label", "正在听小7说话，再次点击停止");
+        voiceButton.title = "正在听小7说话……";
+      }
+      document.querySelector("#xiaowuChatForm")?.classList.add("listening");
+      showChatNotice("🎙️ 正在听小7说话……");
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = event.results[index][0]?.transcript || "";
+        if (event.results[index].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      if (input) {
+        const nextText = `${originalValue}${originalValue && (finalTranscript || interimTranscript) ? " " : ""}${finalTranscript || interimTranscript}`.trimStart();
+        input.value = nextText;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error(debugPrefix, "speech recognition failed", event);
+      showChatNotice("🌸 小7，刚才没有听清楚。可以再点一次麦克风，慢慢说。");
+      stopVoiceInput();
+    };
+
+    recognition.onend = () => {
+      resetVoiceInputState();
+      if (finalTranscript.trim()) {
+        historySyncMessage = "";
+        renderHistory();
+      }
+      input?.focus();
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error(debugPrefix, "speech recognition start failed", error);
+      showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
+      stopVoiceInput();
+    }
+  }
+
+  function stopVoiceInput() {
+    if (recognition && isListening) {
+      try {
+        recognition.stop();
+      } catch (error) {
+        console.error(debugPrefix, "speech recognition stop failed", error);
+      }
+    }
+    resetVoiceInputState();
+  }
+
+  function resetVoiceInputState() {
+    const voiceButton = document.querySelector(".xiaowu-voice-button");
+    recognition = null;
+    isListening = false;
+    if (voiceButton) {
+      voiceButton.classList.remove("listening");
+      voiceButton.textContent = "🎤";
+      voiceButton.setAttribute("aria-label", "语音输入");
+      voiceButton.title = "";
+    }
+    document.querySelector("#xiaowuChatForm")?.classList.remove("listening");
   }
 
   function handleInputKeydown(event) {
@@ -444,6 +603,25 @@
     if (input) input.disabled = nextValue;
   }
 
+  function toggleAnswerSpeech(record) {
+    if (!record?.answer || record.status === "sending") return;
+
+    if (currentlySpeakingId === record.id && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      currentlySpeakingId = "";
+      renderHistory();
+      return;
+    }
+
+    currentlySpeakingId = record.id;
+    const started = speakWithXiaoWuVoice(record.answer, () => {
+      currentlySpeakingId = "";
+      renderHistory();
+    });
+    if (!started) currentlySpeakingId = "";
+    renderHistory();
+  }
+
   function renderHistory() {
     const history = document.querySelector("#xiaowuChatHistory");
     if (!history) return;
@@ -502,6 +680,17 @@
           : renderMarkdown(record.answer);
         answer.appendChild(answerMeta);
         answer.appendChild(answerText);
+
+        if (record.answer && record.status !== "sending") {
+          const speechButton = createElement(
+            "button",
+            "xiaowu-speech-button",
+            currentlySpeakingId === record.id ? "停止朗读" : "🔊 听小吴老师说"
+          );
+          speechButton.type = "button";
+          speechButton.addEventListener("click", () => toggleAnswerSpeech(record));
+          answer.appendChild(speechButton);
+        }
 
         if (record.lessonLinks?.length) {
           const links = createElement("div", "xiaowu-lesson-links");

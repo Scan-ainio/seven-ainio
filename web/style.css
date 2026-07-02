@@ -2089,6 +2089,20 @@ textarea:focus {
   text-decoration: none;
 }
 
+.xiaowu-speech-button {
+  min-height: 38px;
+  margin-top: 10px;
+  padding: 7px 11px;
+  border: 1px solid #ead7c3;
+  border-radius: 999px;
+  background: #fff8f2;
+  color: #7d4557;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .xiaowu-chat-form {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 64px;
@@ -2123,6 +2137,28 @@ textarea:focus {
 .xiaowu-voice-button {
   border: 1px solid #ead7c3;
   background: #fff8f2;
+  color: #7d4557;
+}
+
+.xiaowu-chat-form.listening {
+  grid-template-columns: minmax(0, 1fr) 64px;
+}
+
+.xiaowu-chat-form.listening .xiaowu-voice-button {
+  grid-column: 1 / -1;
+}
+
+.xiaowu-chat-form.listening textarea {
+  grid-column: 1 / 2;
+}
+
+.xiaowu-chat-form.listening .xiaowu-send-button {
+  grid-column: 2 / 3;
+}
+
+.xiaowu-voice-button.listening {
+  background: #fff0f4;
+  border-color: #e8bdc9;
   color: #7d4557;
 }
 
