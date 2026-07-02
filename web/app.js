@@ -38,6 +38,8 @@ const dailyLineText = document.querySelector("#dailyLineText");
 const encouragementText = document.querySelector("#encouragementText");
 const todayStudyTime = document.querySelector("#todayStudyTime");
 const totalStudyTime = document.querySelector("#totalStudyTime");
+const todayXiaoWuChatTime = document.querySelector("#todayXiaoWuChatTime");
+const totalXiaoWuChatTime = document.querySelector("#totalXiaoWuChatTime");
 const courseLessonLabel = document.querySelector("#courseLessonLabel");
 const courseTitle = document.querySelector("#courseTitle");
 const courseMeta = document.querySelector("#courseMeta");
@@ -119,6 +121,9 @@ const todayStudyKey = "takken_today_study_seconds_v1";
 const totalStudyKey = "takken_total_study_seconds_v1";
 const studyDateKey = "takken_today_study_date_v1";
 const dailyStudyLogKey = "takken_daily_study_log_v1";
+const todayXiaoWuChatKey = "takken_today_xiaowu_chat_seconds_v1";
+const totalXiaoWuChatKey = "takken_total_xiaowu_chat_seconds_v1";
+const xiaoWuChatDateKey = "takken_today_xiaowu_chat_date_v1";
 const coachLines = [
   "小7，这题我们慢慢来。",
   "别急，这一题 Scan 陪你拆开理解。",
@@ -805,6 +810,16 @@ function ensureStudyDate() {
   }
 }
 
+function ensureXiaoWuChatDate() {
+  const today = getTodayKey();
+  const savedDate = localStorage.getItem(xiaoWuChatDateKey);
+
+  if (savedDate !== today) {
+    localStorage.setItem(xiaoWuChatDateKey, today);
+    writeNumberStorage(todayXiaoWuChatKey, 0);
+  }
+}
+
 function formatStudyTime(seconds) {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safeSeconds / 3600);
@@ -822,6 +837,13 @@ function renderStudyTime() {
   ensureStudyDate();
   todayStudyTime.textContent = formatStudyTime(readNumberStorage(todayStudyKey));
   totalStudyTime.textContent = formatStudyTime(readNumberStorage(totalStudyKey));
+}
+
+function renderXiaoWuChatTime() {
+  if (!todayXiaoWuChatTime || !totalXiaoWuChatTime) return;
+  ensureXiaoWuChatDate();
+  todayXiaoWuChatTime.textContent = formatStudyTime(readNumberStorage(todayXiaoWuChatKey));
+  totalXiaoWuChatTime.textContent = formatStudyTime(readNumberStorage(totalXiaoWuChatKey));
 }
 
 function saveStudyDelta() {
@@ -1273,9 +1295,11 @@ function toggleMistakePanel() {
 setCompanionGreeting();
 renderBrainPlan();
 renderStudyTime();
+renderXiaoWuChatTime();
 renderMistakeHistory();
 setQuestionSource("original", false);
 window.addEventListener("xiaowu-course-ready", renderBrainPlan);
+window.addEventListener("xiaowu-chat-time-updated", renderXiaoWuChatTime);
 startStudyButton.addEventListener("click", startTodayLesson);
 completeTodayButton.addEventListener("click", completeTodayPlan);
 courseStartButton.addEventListener("click", startCourseLesson);

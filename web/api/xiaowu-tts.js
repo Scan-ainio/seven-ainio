@@ -1,5 +1,5 @@
 const DEFAULT_VOICE = "zh-CN-YunxiNeural";
-const DEFAULT_SPEED = 0.92;
+const DEFAULT_SPEED = 1;
 const OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 
 function sendJson(res, status, payload) {
@@ -35,7 +35,7 @@ function escapeXml(value) {
 
 function speedToRate(speedValue) {
   const speed = Number(speedValue);
-  if (!Number.isFinite(speed)) return "-8%";
+  if (!Number.isFinite(speed)) return "0%";
   const percent = Math.round((Math.min(1.3, Math.max(0.7, speed)) - 1) * 100);
   return `${percent > 0 ? "+" : ""}${percent}%`;
 }

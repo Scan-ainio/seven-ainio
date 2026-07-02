@@ -1,5 +1,5 @@
 const USER_ID = "xiaoqi-default";
-const HISTORY_KEY = `xiaowu:history:${USER_ID}`;
+const HISTORY_KEY = `xiaowu:history:v2:${USER_ID}`;
 const MAX_HISTORY_ITEMS = 500;
 
 function sendJson(res, status, payload) {

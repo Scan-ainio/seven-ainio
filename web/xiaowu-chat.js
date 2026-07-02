@@ -1,14 +1,17 @@
 (() => {
-  const storageKey = "takken_xiaowu_teacher_chat_v1";
+  const storageKey = "takken_xiaowu_teacher_chat_v2";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const voiceChoiceKey = "takken_xiaowu_teacher_voice_uri_v1";
+  const chatTodayTimeKey = "takken_today_xiaowu_chat_seconds_v1";
+  const chatTotalTimeKey = "takken_total_xiaowu_chat_seconds_v1";
+  const chatTimeDateKey = "takken_today_xiaowu_chat_date_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
   const ttsEndpoint = "/api/xiaowu-tts";
   const xiaoWuTtsEngine = "azure";
   const xiaoWuVoiceName = "zh-CN-YunxiNeural";
-  const xiaoWuVoiceSpeed = 0.92;
+  const xiaoWuVoiceSpeed = 1;
   const maxHistoryForApi = 8;
   const debugPrefix = "[XiaoWu Teacher Chat]";
 
@@ -43,6 +46,8 @@
   let pendingPlayback = null;
   let selectedVoiceURI = localStorage.getItem(voiceChoiceKey) || "auto-male";
   let pageScrollBeforeChat = 0;
+  let chatTimerId = null;
+  let chatLastTick = null;
 
   function readRecords() {
     try {
@@ -55,6 +60,73 @@
 
   function saveRecords() {
     localStorage.setItem(storageKey, JSON.stringify(chatRecords));
+  }
+
+  function getTodayKey() {
+    const now = new Date();
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function readNumberStorage(key) {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function writeNumberStorage(key, value) {
+    localStorage.setItem(key, String(Math.max(0, Math.floor(value))));
+  }
+
+  function ensureChatTimeDate() {
+    const today = getTodayKey();
+    if (localStorage.getItem(chatTimeDateKey) !== today) {
+      localStorage.setItem(chatTimeDateKey, today);
+      writeNumberStorage(chatTodayTimeKey, 0);
+    }
+  }
+
+  function notifyChatTimeUpdated() {
+    window.dispatchEvent(new CustomEvent("xiaowu-chat-time-updated"));
+  }
+
+  function saveChatTimeDelta() {
+    if (!isOpen || !chatLastTick) return;
+
+    const now = Date.now();
+    const deltaSeconds = Math.floor((now - chatLastTick) / 1000);
+    if (deltaSeconds <= 0) return;
+
+    ensureChatTimeDate();
+    writeNumberStorage(chatTodayTimeKey, readNumberStorage(chatTodayTimeKey) + deltaSeconds);
+    writeNumberStorage(chatTotalTimeKey, readNumberStorage(chatTotalTimeKey) + deltaSeconds);
+    chatLastTick += deltaSeconds * 1000;
+    notifyChatTimeUpdated();
+  }
+
+  function startChatTimer() {
+    ensureChatTimeDate();
+    if (document.visibilityState !== "visible") {
+      notifyChatTimeUpdated();
+      return;
+    }
+    chatLastTick = Date.now();
+    if (!chatTimerId) {
+      chatTimerId = setInterval(saveChatTimeDelta, 1000);
+    }
+    notifyChatTimeUpdated();
+  }
+
+  function stopChatTimer() {
+    saveChatTimeDelta();
+    chatLastTick = null;
+    if (chatTimerId) {
+      clearInterval(chatTimerId);
+      chatTimerId = null;
+    }
+    notifyChatTimeUpdated();
   }
 
   function mergeRecords(primaryRecords, secondaryRecords) {
@@ -312,7 +384,7 @@
     } else {
       utterance.lang = "zh-CN";
     }
-    utterance.rate = 0.88;
+    utterance.rate = 1;
     utterance.pitch = 1.05;
     utterance.volume = 1;
     utterance.onend = () => {
@@ -450,12 +522,14 @@
     document.body.style.top = `-${pageScrollBeforeChat}px`;
     document.querySelector("#xiaowuChatWindow").classList.remove("hidden");
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "true");
+    startChatTimer();
     renderHistory();
     loadServerHistory();
     setTimeout(() => document.querySelector("#xiaowuChatInput")?.focus(), 50);
   }
 
   function closeChat() {
+    stopChatTimer();
     isOpen = false;
     expandedIds = new Set();
     collapsedIds = new Set();
@@ -1001,4 +1075,15 @@
   } else {
     buildWidget();
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!isOpen) return;
+    if (document.visibilityState === "hidden") {
+      stopChatTimer();
+    } else {
+      startChatTimer();
+    }
+  });
+
+  window.addEventListener("beforeunload", stopChatTimer);
 })();
