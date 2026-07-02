@@ -3,6 +3,7 @@
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const maxHistoryForApi = 8;
+  const debugPrefix = "[XiaoWu Teacher Chat]";
 
   const lessonTitles = {
     "lesson-001": "Lesson001｜免許・欠格・営業保証金・保証協会",
@@ -88,6 +89,9 @@
     document.querySelector("#xiaowuChatFab").addEventListener("click", openChat);
     document.querySelector("#xiaowuChatClose").addEventListener("click", closeChat);
     document.querySelector("#xiaowuChatForm").addEventListener("submit", handleSubmit);
+    document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
+      console.log(debugPrefix, "send button clicked");
+    });
     document.querySelector("#xiaowuChatInput").addEventListener("keydown", handleInputKeydown);
     renderHistory();
   }
@@ -141,6 +145,12 @@
     renderHistory();
 
     try {
+      console.log(debugPrefix, "fetch start", {
+        url: apiEndpoint,
+        currentLessonId: getCurrentLessonId(),
+        messageLength: message.length
+      });
+
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,13 +165,22 @@
       });
 
       const data = await response.json().catch(() => ({}));
+      console.log(debugPrefix, "fetch complete", {
+        url: apiEndpoint,
+        status: response.status,
+        ok: response.ok
+      });
       const answer = data.reply || "🌸 小7，小吴老师刚才没能回答成功。稍后再问我一次，好不好？";
       updateRecord(record.id, {
         answer,
         lessonLinks: normalizeLessonLinks(data.lessonLinks),
         status: response.ok ? "done" : "error"
       });
-    } catch {
+    } catch (error) {
+      console.error(debugPrefix, "fetch failed", {
+        url: apiEndpoint,
+        error
+      });
       updateRecord(record.id, {
         answer: "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。",
         lessonLinks: [],
