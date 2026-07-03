@@ -1,10 +1,11 @@
 const USER_ID = "xiaoqi-default";
-const HISTORY_KEY = `xiaowu:history:v2:${USER_ID}`;
-const MAX_HISTORY_ITEMS = 500;
+const HISTORY_KEY = `xiaowu:history:${USER_ID}`;
+const MAX_HISTORY_ITEMS = 200;
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(payload));
 }
 
@@ -31,70 +32,42 @@ async function parseBody(req) {
   }
 }
 
-function normalizeText(value, maxLength = 8000) {
-  return String(value || "").trim().slice(0, maxLength);
+function normalizeBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
 }
 
-function getKvConfig() {
+function getRedisConfig() {
+  const url = normalizeBaseUrl(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL);
+  const token = String(process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+
   return {
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN
+    url,
+    token,
+    envCheck: {
+      hasKvRestApiUrl: Boolean(process.env.KV_REST_API_URL),
+      hasKvRestApiToken: Boolean(process.env.KV_REST_API_TOKEN),
+      hasUpstashRedisRestUrl: Boolean(process.env.UPSTASH_REDIS_REST_URL),
+      hasUpstashRedisRestToken: Boolean(process.env.UPSTASH_REDIS_REST_TOKEN),
+      selectedUrlEnv: process.env.KV_REST_API_URL ? "KV_REST_API_URL" : (process.env.UPSTASH_REDIS_REST_URL ? "UPSTASH_REDIS_REST_URL" : ""),
+      selectedTokenEnv: process.env.KV_REST_API_TOKEN ? "KV_REST_API_TOKEN" : (process.env.UPSTASH_REDIS_REST_TOKEN ? "UPSTASH_REDIS_REST_TOKEN" : "")
+    }
   };
 }
 
-function assertKvConfigured() {
-  const config = getKvConfig();
+function assertRedisConfigured(method) {
+  const config = getRedisConfig();
   if (!config.url || !config.token) {
-    const error = new Error("Vercel KV is not configured");
-    error.code = "KV_NOT_CONFIGURED";
+    const error = new Error("Upstash Redis REST environment variables are missing");
+    error.code = "REDIS_ENV_MISSING";
+    error.envCheck = config.envCheck;
+    error.method = method;
     throw error;
   }
   return config;
 }
 
-async function kvCommand(command) {
-  const { url, token } = assertKvConfigured();
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(command)
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error = new Error(`KV command failed with ${response.status}`);
-    error.details = data;
-    throw error;
-  }
-
-  if (data.error) {
-    const error = new Error(data.error);
-    error.details = data;
-    throw error;
-  }
-
-  return data.result;
-}
-
-async function readHistory() {
-  const raw = await kvCommand(["GET", HISTORY_KEY]);
-  if (!raw) return [];
-
-  try {
-    const records = JSON.parse(raw);
-    return Array.isArray(records) ? records : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeHistory(records) {
-  const trimmed = records.slice(-MAX_HISTORY_ITEMS);
-  await kvCommand(["SET", HISTORY_KEY, JSON.stringify(trimmed)]);
-  return trimmed;
+function normalizeText(value, maxLength = 8000) {
+  return String(value || "").trim().slice(0, maxLength);
 }
 
 function normalizeLessonLinks(value) {
@@ -126,8 +99,8 @@ function normalizeRecord(input) {
   };
 }
 
-function mergeRecord(records, record) {
-  const existing = records.find((item) => item.id === record.id);
+function mergeRecord(history, record) {
+  const existing = history.find((item) => item.id === record.id);
   const merged = existing
     ? {
         ...existing,
@@ -137,57 +110,159 @@ function mergeRecord(records, record) {
         status: record.answer ? record.status : (existing.status || record.status)
       }
     : record;
-  const withoutSame = records.filter((item) => item.id !== merged.id);
 
-  return [...withoutSame, merged].sort((a, b) => {
-    const left = new Date(a.createdAt).getTime() || 0;
-    const right = new Date(b.createdAt).getTime() || 0;
-    return left - right;
+  return [...history.filter((item) => item.id !== merged.id), merged]
+    .sort((a, b) => {
+      const left = new Date(a.createdAt).getTime() || 0;
+      const right = new Date(b.createdAt).getTime() || 0;
+      return left - right;
+    })
+    .slice(-MAX_HISTORY_ITEMS);
+}
+
+async function upstashFetch(path, options, method) {
+  const { url, token, envCheck } = assertRedisConfigured(method);
+  const response = await fetch(`${url}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {})
+    }
   });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.error) {
+    const error = new Error(data.error || `Upstash REST request failed with ${response.status}`);
+    error.code = "UPSTASH_REST_FAILED";
+    error.status = response.status;
+    error.upstashResponse = data;
+    error.envCheck = envCheck;
+    error.method = method;
+    throw error;
+  }
+
+  return { data, envCheck };
+}
+
+async function readHistory(method) {
+  const encodedKey = encodeURIComponent(HISTORY_KEY);
+  const { data } = await upstashFetch(`/get/${encodedKey}`, { method: "GET" }, method);
+  const raw = data.result;
+
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    if (typeof parsed === "string") {
+      const parsedAgain = JSON.parse(parsed);
+      return Array.isArray(parsedAgain) ? parsedAgain : [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeHistory(history, method) {
+  const encodedKey = encodeURIComponent(HISTORY_KEY);
+  await upstashFetch(`/set/${encodedKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(history.slice(-MAX_HISTORY_ITEMS))
+  }, method);
+  return history.slice(-MAX_HISTORY_ITEMS);
+}
+
+function buildErrorPayload(error, method) {
+  return {
+    ok: false,
+    error: error.code || "XIAOWU_HISTORY_FAILED",
+    message: "小吴老师云端记忆还没有连接成功 🌸",
+    detail: error.message,
+    envCheck: error.envCheck || getRedisConfig().envCheck,
+    method,
+    status: error.status || null,
+    upstashResponse: error.upstashResponse || null
+  };
 }
 
 module.exports = async function handler(req, res) {
+  const method = req.method || "UNKNOWN";
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   res.setHeader("Cache-Control", "no-store");
 
-  if (req.method === "OPTIONS") {
+  if (method === "OPTIONS") {
     res.statusCode = 204;
     res.end();
     return;
   }
 
   try {
-    if (req.method === "GET") {
-      const records = await readHistory();
-      sendJson(res, 200, { userId: USER_ID, records });
+    if (method === "GET") {
+      const history = await readHistory(method);
+      sendJson(res, 200, {
+        ok: true,
+        userId: USER_ID,
+        history,
+        records: history,
+        count: history.length,
+        method,
+        envCheck: getRedisConfig().envCheck
+      });
       return;
     }
 
-    if (req.method === "POST") {
+    if (method === "POST") {
       const body = await parseBody(req);
       const record = normalizeRecord(body);
 
       if (!record.question) {
-        sendJson(res, 400, { error: "question is required" });
+        sendJson(res, 400, {
+          ok: false,
+          error: "QUESTION_REQUIRED",
+          message: "question is required",
+          envCheck: getRedisConfig().envCheck,
+          method
+        });
         return;
       }
 
-      const current = await readHistory();
-      const records = await writeHistory(mergeRecord(current, record));
-      sendJson(res, 200, { ok: true, userId: USER_ID, record, recordsCount: records.length });
+      const current = await readHistory(method);
+      const history = await writeHistory(mergeRecord(current, record), method);
+      sendJson(res, 200, {
+        ok: true,
+        saved: true,
+        userId: USER_ID,
+        record,
+        history,
+        records: history,
+        count: history.length,
+        recordsCount: history.length,
+        method,
+        envCheck: getRedisConfig().envCheck
+      });
       return;
     }
 
-    sendJson(res, 405, { error: "Method not allowed" });
-  } catch (error) {
-    console.error("[xiaowu-history] request failed", error);
-    const status = error.code === "KV_NOT_CONFIGURED" ? 500 : 502;
-    sendJson(res, status, {
-      error: error.code || "HISTORY_SYNC_FAILED",
-      message: "小吴老师云端记忆还没有连接成功 🌸",
-      detail: error.message,
-      records: []
+    sendJson(res, 405, {
+      ok: false,
+      error: "METHOD_NOT_ALLOWED",
+      message: "Method not allowed",
+      envCheck: getRedisConfig().envCheck,
+      method
     });
+  } catch (error) {
+    console.error("[xiaowu-history] cloud memory API failed", {
+      error: error.code || "XIAOWU_HISTORY_FAILED",
+      message: error.message,
+      envCheck: error.envCheck || getRedisConfig().envCheck,
+      method,
+      status: error.status || null,
+      upstashResponse: error.upstashResponse || null
+    });
+    sendJson(res, 500, buildErrorPayload(error, method));
   }
 };
