@@ -40,6 +40,8 @@
   let recognition = null;
   let isListening = false;
   let voiceInputActive = false;
+  let voiceAutoSend = false;
+  let voiceAutoSendTimer = null;
   let voiceSessionId = 0;
   let voiceListenTimer = null;
   let currentlySpeakingId = "";
@@ -615,14 +617,20 @@
       stopVoiceInput();
       return;
     }
+    const isInterruptingSpeech = Boolean(currentlySpeakingId || currentAudio || ("speechSynthesis" in window && window.speechSynthesis.speaking));
+    if (isInterruptingSpeech) {
+      stopXiaoWuSpeech();
+      startVoiceInput({ autoSend: true });
+      return;
+    }
     startVoiceInput();
   }
 
-  function startVoiceInput() {
+  function startVoiceInput(options = {}) {
     const Recognition = getSpeechRecognitionConstructor();
     const voiceButton = document.querySelector(".xiaowu-voice-button");
     const input = document.querySelector("#xiaowuChatInput");
-    const listeningMessage = "🎙️ 正在听小7说话……";
+    const listeningMessage = options.autoSend ? "🎙️ 小吴先听小7说，听完会自动发送。" : "🎙️ 正在听小7说话……";
 
     if (!Recognition) {
       showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
@@ -634,6 +642,7 @@
     const sessionId = Date.now();
     voiceSessionId = sessionId;
     voiceInputActive = true;
+    voiceAutoSend = Boolean(options.autoSend);
     startRecognitionSession(Recognition, sessionId, listeningMessage);
   }
 
@@ -657,9 +666,9 @@
       isListening = true;
       if (voiceButton) {
         voiceButton.classList.add("listening");
-        voiceButton.textContent = "🎙️ 正在听小7说话……";
+        voiceButton.textContent = voiceAutoSend ? "🎙️ 插话中……" : "🎙️ 正在听小7说话……";
         voiceButton.setAttribute("aria-label", "正在听小7说话，再次点击停止");
-        voiceButton.title = "正在听小7说话……";
+        voiceButton.title = voiceAutoSend ? "小吴正在听小7插话，停顿后会自动发送。" : "正在听小7说话……";
       }
       document.querySelector("#xiaowuChatForm")?.classList.add("listening");
       showChatNotice(listeningMessage);
@@ -682,6 +691,7 @@
         const nextText = `${originalValue}${originalValue && spokenText ? " " : ""}${spokenText}`.trimStart();
         input.value = nextText;
       }
+      if (voiceAutoSend && hadResult) scheduleVoiceAutoSend(sessionId);
     };
 
     activeRecognition.onerror = (event) => {
@@ -699,6 +709,7 @@
       const fatalErrors = ["audio-capture", "not-allowed", "service-not-allowed"];
       if (fatalErrors.includes(event.error)) {
         voiceInputActive = false;
+        voiceAutoSend = false;
         resetVoiceInputState({ keepNotice: true, sessionId });
       }
     };
@@ -737,6 +748,8 @@
 
   function stopVoiceInput(options = {}) {
     voiceInputActive = false;
+    voiceAutoSend = false;
+    clearVoiceAutoSendTimer();
     const activeRecognition = recognition;
     if (activeRecognition) {
       try {
@@ -763,6 +776,23 @@
     }
   }
 
+  function clearVoiceAutoSendTimer() {
+    if (voiceAutoSendTimer) {
+      window.clearTimeout(voiceAutoSendTimer);
+      voiceAutoSendTimer = null;
+    }
+  }
+
+  function scheduleVoiceAutoSend(sessionId) {
+    clearVoiceAutoSendTimer();
+    voiceAutoSendTimer = window.setTimeout(() => {
+      if (voiceSessionId !== sessionId || !voiceAutoSend) return;
+      const input = document.querySelector("#xiaowuChatInput");
+      if (!input?.value.trim() || isSending) return;
+      document.querySelector("#xiaowuChatForm")?.requestSubmit();
+    }, 1300);
+  }
+
   function resetVoiceInputState(options = {}) {
     if (options.sessionId && options.sessionId !== voiceSessionId) return;
     const voiceButton = document.querySelector(".xiaowu-voice-button");
@@ -771,10 +801,12 @@
       voiceListenTimer = null;
     }
     if (!options.sessionId) voiceSessionId += 1;
+    clearVoiceAutoSendTimer();
     cleanupRecognitionHandlers();
     recognition = null;
     isListening = false;
     voiceInputActive = false;
+    voiceAutoSend = false;
     if (voiceButton) {
       voiceButton.classList.remove("listening");
       voiceButton.textContent = "🎤";
@@ -797,6 +829,7 @@
     if (isSending) return;
 
     const input = document.querySelector("#xiaowuChatInput");
+    stopVoiceInput({ forceAbort: true, silent: true });
     const message = input.value.trim();
     if (!message) return;
 
