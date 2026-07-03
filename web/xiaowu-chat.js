@@ -39,6 +39,9 @@
   let isHistoryLoading = false;
   let recognition = null;
   let isListening = false;
+  let voiceInputActive = false;
+  let voiceSessionId = 0;
+  let voiceListenTimer = null;
   let currentlySpeakingId = "";
   let autoSpeechEnabled = localStorage.getItem(autoSpeechKey) !== "0";
   let currentAudio = null;
@@ -301,6 +304,13 @@
     renderHistory();
   }
 
+  function clearChatNotice(message) {
+    if (!message || historySyncMessage === message) {
+      historySyncMessage = "";
+      renderHistory();
+    }
+  }
+
   function stripForSpeech(text) {
     return String(text || "")
       .replace(/```[\s\S]*?```/g, " ")
@@ -538,7 +548,7 @@
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "false");
     document.body.classList.remove("xiaowu-chat-open");
     document.body.style.top = "";
-    stopVoiceInput();
+    stopVoiceInput({ forceAbort: true });
     stopXiaoWuSpeech();
     renderHistory();
     requestAnimationFrame(() => window.scrollTo(0, pageScrollBeforeChat));
@@ -601,7 +611,7 @@
   }
 
   function toggleVoiceInput() {
-    if (isListening) {
+    if (voiceInputActive || isListening) {
       stopVoiceInput();
       return;
     }
@@ -612,22 +622,38 @@
     const Recognition = getSpeechRecognitionConstructor();
     const voiceButton = document.querySelector(".xiaowu-voice-button");
     const input = document.querySelector("#xiaowuChatInput");
+    const listeningMessage = "🎙️ 正在听小7说话……";
 
     if (!Recognition) {
       showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
       return;
     }
 
-    stopVoiceInput();
-    recognition = new Recognition();
-    recognition.lang = getSpeechLanguage();
-    recognition.interimResults = true;
-    recognition.continuous = false;
+    stopVoiceInput({ silent: true, forceAbort: true });
+
+    const sessionId = Date.now();
+    voiceSessionId = sessionId;
+    voiceInputActive = true;
+    startRecognitionSession(Recognition, sessionId, listeningMessage);
+  }
+
+  function startRecognitionSession(Recognition, sessionId, listeningMessage) {
+    const voiceButton = document.querySelector(".xiaowu-voice-button");
+    const input = document.querySelector("#xiaowuChatInput");
+    let activeRecognition = new Recognition();
+    recognition = activeRecognition;
+    activeRecognition.lang = getSpeechLanguage();
+    activeRecognition.interimResults = true;
+    activeRecognition.continuous = true;
+    activeRecognition.maxAlternatives = 1;
 
     const originalValue = input?.value || "";
-    let finalTranscript = "";
+    let sessionFinalTranscript = "";
+    let hadResult = false;
+    let voiceErrorMessage = "";
 
-    recognition.onstart = () => {
+    activeRecognition.onstart = () => {
+      if (voiceSessionId !== sessionId) return;
       isListening = true;
       if (voiceButton) {
         voiceButton.classList.add("listening");
@@ -636,64 +662,119 @@
         voiceButton.title = "正在听小7说话……";
       }
       document.querySelector("#xiaowuChatForm")?.classList.add("listening");
-      showChatNotice("🎙️ 正在听小7说话……");
+      showChatNotice(listeningMessage);
     };
 
-    recognition.onresult = (event) => {
+    activeRecognition.onresult = (event) => {
+      if (voiceSessionId !== sessionId) return;
       let interimTranscript = "";
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const transcript = event.results[index][0]?.transcript || "";
         if (event.results[index].isFinal) {
-          finalTranscript += transcript;
+          sessionFinalTranscript += transcript;
         } else {
           interimTranscript += transcript;
         }
       }
+      hadResult = Boolean((sessionFinalTranscript || interimTranscript).trim());
       if (input) {
-        const nextText = `${originalValue}${originalValue && (finalTranscript || interimTranscript) ? " " : ""}${finalTranscript || interimTranscript}`.trimStart();
+        const spokenText = `${sessionFinalTranscript}${interimTranscript}`.trim();
+        const nextText = `${originalValue}${originalValue && spokenText ? " " : ""}${spokenText}`.trimStart();
         input.value = nextText;
       }
     };
 
-    recognition.onerror = (event) => {
+    activeRecognition.onerror = (event) => {
+      if (voiceSessionId !== sessionId) return;
       console.error(debugPrefix, "speech recognition failed", event);
-      showChatNotice("🌸 小7，刚才没有听清楚。可以再点一次麦克风，慢慢说。");
-      stopVoiceInput();
+      const errorMessages = {
+        "audio-capture": "🌸 小7，没有找到麦克风。可以检查一下浏览器麦克风权限。",
+        "not-allowed": "🌸 小7，麦克风权限还没有打开。请允许浏览器使用麦克风后再试一次。",
+        "service-not-allowed": "🌸 小7，浏览器暂时不允许语音输入，可以先打字问小吴老师。",
+        "no-speech": "🌸 小7，这次没有听到声音，小吴还在继续听。",
+        "network": "🌸 小7，语音识别网络有点卡，可以再试一次。"
+      };
+      voiceErrorMessage = errorMessages[event.error] || "🌸 小7，刚才没有听清楚。可以再点一次麦克风，慢慢说。";
+      showChatNotice(voiceErrorMessage);
+      const fatalErrors = ["audio-capture", "not-allowed", "service-not-allowed"];
+      if (fatalErrors.includes(event.error)) {
+        voiceInputActive = false;
+        resetVoiceInputState({ keepNotice: true, sessionId });
+      }
     };
 
-    recognition.onend = () => {
-      resetVoiceInputState();
-      if (finalTranscript.trim()) {
-        historySyncMessage = "";
-        renderHistory();
+    activeRecognition.onend = () => {
+      if (voiceSessionId !== sessionId) return;
+      cleanupRecognitionHandlers();
+      recognition = null;
+      isListening = false;
+
+      if (sessionFinalTranscript.trim()) {
+        clearChatNotice(listeningMessage);
       }
+
+      if (voiceInputActive) {
+        window.setTimeout(() => {
+          if (voiceSessionId !== sessionId || !voiceInputActive) return;
+          startRecognitionSession(Recognition, sessionId, listeningMessage);
+        }, hadResult ? 180 : 450);
+        return;
+      }
+
+      resetVoiceInputState({ keepNotice: Boolean(voiceErrorMessage) || !hadResult, sessionId });
       input?.focus();
     };
 
     try {
-      recognition.start();
+      activeRecognition.start();
     } catch (error) {
       console.error(debugPrefix, "speech recognition start failed", error);
       showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
-      stopVoiceInput();
+      voiceInputActive = false;
+      resetVoiceInputState({ keepNotice: true, sessionId });
     }
   }
 
-  function stopVoiceInput() {
-    if (recognition && isListening) {
+  function stopVoiceInput(options = {}) {
+    voiceInputActive = false;
+    const activeRecognition = recognition;
+    if (activeRecognition) {
       try {
-        recognition.stop();
+        if (options.forceAbort || !isListening) {
+          activeRecognition.abort();
+        } else {
+          activeRecognition.stop();
+        }
       } catch (error) {
         console.error(debugPrefix, "speech recognition stop failed", error);
       }
     }
-    resetVoiceInputState();
+    if (options.forceAbort || !isListening) {
+      resetVoiceInputState(options);
+    }
   }
 
-  function resetVoiceInputState() {
+  function cleanupRecognitionHandlers() {
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+    }
+  }
+
+  function resetVoiceInputState(options = {}) {
+    if (options.sessionId && options.sessionId !== voiceSessionId) return;
     const voiceButton = document.querySelector(".xiaowu-voice-button");
+    if (voiceListenTimer) {
+      window.clearTimeout(voiceListenTimer);
+      voiceListenTimer = null;
+    }
+    if (!options.sessionId) voiceSessionId += 1;
+    cleanupRecognitionHandlers();
     recognition = null;
     isListening = false;
+    voiceInputActive = false;
     if (voiceButton) {
       voiceButton.classList.remove("listening");
       voiceButton.textContent = "🎤";
@@ -701,6 +782,7 @@
       voiceButton.title = "";
     }
     document.querySelector("#xiaowuChatForm")?.classList.remove("listening");
+    if (!options.keepNotice) clearChatNotice("🎙️ 正在听小7说话……");
   }
 
   function handleInputKeydown(event) {
