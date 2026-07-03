@@ -1912,7 +1912,6 @@ body.xiaowu-chat-open {
   color: #174f3d;
 }
 
-.xiaowu-voice-select-wrap,
 .xiaowu-speed-select-wrap {
   flex: 0 1 150px;
   display: grid;
@@ -1923,7 +1922,6 @@ body.xiaowu-chat-open {
   font-weight: 900;
 }
 
-.xiaowu-voice-select-wrap select,
 .xiaowu-speed-select-wrap select {
   width: 100%;
   min-height: 34px;
@@ -2307,7 +2305,6 @@ body.xiaowu-chat-open {
     max-width: 100%;
   }
 
-  .xiaowu-voice-select-wrap,
   .xiaowu-speed-select-wrap {
     grid-column: 1 / 2;
     width: min(100%, 260px);

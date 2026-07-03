@@ -3,7 +3,6 @@
   const pendingHistoryKey = "takken_xiaowu_teacher_pending_history_v1";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
-  const voiceChoiceKey = "takken_xiaowu_teacher_voice_uri_v1";
   const speechSpeedKey = "takken_xiaowu_teacher_speech_speed_v1";
   const chatTodayTimeKey = "takken_today_xiaowu_chat_seconds_v1";
   const chatTotalTimeKey = "takken_total_xiaowu_chat_seconds_v1";
@@ -51,9 +50,12 @@
   let currentAudio = null;
   let currentAudioUrl = "";
   let pendingPlayback = null;
-  let selectedVoiceURI = localStorage.getItem(voiceChoiceKey) || "auto-male";
   let xiaoWuVoiceSpeed = Number(localStorage.getItem(speechSpeedKey)) || 1;
-  if (![0.8, 1, 1.2, 1.5, 2].includes(xiaoWuVoiceSpeed)) xiaoWuVoiceSpeed = 1;
+  const speechSpeedOptions = [0.8, 1, 1.2, 1.5, 2, 2.5, 3];
+  if (!speechSpeedOptions.includes(xiaoWuVoiceSpeed)) xiaoWuVoiceSpeed = 1;
+  let activeSpeechEngine = "";
+  let activeBrowserSpeechText = "";
+  let activeBrowserSpeechRecordId = "";
   let pageScrollBeforeChat = 0;
   let chatTimerId = null;
   let chatLastTick = null;
@@ -503,47 +505,10 @@
       URL.revokeObjectURL(currentAudioUrl);
       currentAudioUrl = "";
     }
+    if (activeSpeechEngine === "azure") activeSpeechEngine = "";
   }
 
-  function getPreferredSpeechVoice() {
-    if (!("speechSynthesis" in window)) return null;
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices.length) return null;
-
-    if (selectedVoiceURI && selectedVoiceURI !== "auto-male") {
-      const selected = voices.find((voice) => voice.voiceURI === selectedVoiceURI);
-      if (selected) return selected;
-    }
-
-    const languageOrder = ["zh-CN", "zh-TW", "ja-JP", "en-US"];
-    const malePriority = [
-      "Eddy", "Reed", "Rocko", "Grandpa", "Otoya", "Sinji", "Sin-Ji",
-      "Yunxi", "Yunjian", "Yunyang", "Kangkang", "Danny", "Daniel",
-      "Thomas", "Paul", "Mark", "David", "Microsoft", "Google"
-    ];
-    const naturalPriority = ["Natural", "Premium", "Enhanced", "Neural", "Online"];
-    const femalePenalty = ["Kyoko", "Tingting", "Ting-Ting", "Mei-Jia", "Meijia", "Samantha", "Susan", "Zira", "Hanhan", "Huihui"];
-
-    const scored = voices.map((voice) => {
-      const langIndex = languageOrder.findIndex((lang) => voice.lang?.toLowerCase().startsWith(lang.toLowerCase()));
-      const maleIndex = malePriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
-      const naturalIndex = naturalPriority.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
-      const femaleIndex = femalePenalty.findIndex((keyword) => voice.name?.toLowerCase().includes(keyword.toLowerCase()));
-      return {
-        voice,
-        score:
-          (maleIndex === -1 ? 40 : maleIndex) +
-          (langIndex === -1 ? 25 : langIndex * 3) +
-          (naturalIndex === -1 ? 8 : naturalIndex) +
-          (femaleIndex === -1 ? 0 : 60)
-      };
-    });
-
-    scored.sort((left, right) => left.score - right.score);
-    return scored[0]?.voice || null;
-  }
-
-  function speakWithBrowserVoice(text, onEnd) {
+  function speakWithBrowserVoice(text, onEnd, options = {}) {
     if (!("speechSynthesis" in window)) {
       showChatNotice("🌸 小7，这个浏览器暂时不支持朗读，可以先看文字版的小吴老师。");
       if (typeof onEnd === "function") onEnd();
@@ -551,25 +516,29 @@
     }
 
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(stripForSpeech(text));
-    const voice = getPreferredSpeechVoice();
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang || "zh-CN";
-    } else {
-      utterance.lang = "zh-CN";
-    }
+    const speechText = stripForSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(speechText);
+    utterance.lang = "zh-CN";
     utterance.rate = xiaoWuVoiceSpeed;
     utterance.pitch = 1.05;
     utterance.volume = 1;
     utterance.onend = () => {
       setXiaoWuVoiceStatus("");
+      activeSpeechEngine = "";
+      activeBrowserSpeechText = "";
+      activeBrowserSpeechRecordId = "";
       if (typeof onEnd === "function") onEnd();
     };
     utterance.onerror = () => {
       setXiaoWuVoiceStatus("");
+      activeSpeechEngine = "";
+      activeBrowserSpeechText = "";
+      activeBrowserSpeechRecordId = "";
       if (typeof onEnd === "function") onEnd();
     };
+    activeSpeechEngine = "browser";
+    activeBrowserSpeechText = speechText;
+    activeBrowserSpeechRecordId = options.recordId || currentlySpeakingId || "";
     setXiaoWuVoiceStatus("🔊 正在回答……");
     window.speechSynthesis.speak(utterance);
     return true;
@@ -586,7 +555,7 @@
     if (options.recordId) currentlySpeakingId = options.recordId;
 
     if (xiaoWuTtsEngine === "browser") {
-      return speakWithBrowserVoice(speechText, onEnd);
+      return speakWithBrowserVoice(speechText, onEnd, options);
     }
 
     try {
@@ -609,20 +578,24 @@
       currentAudio = new Audio(currentAudioUrl);
       currentAudio.preload = "auto";
       currentAudio.volume = 1;
+      currentAudio.playbackRate = xiaoWuVoiceSpeed;
       currentAudio.onended = () => {
         cleanupCurrentAudio();
         pendingPlayback = null;
+        activeSpeechEngine = "";
         setXiaoWuVoiceStatus("");
         if (typeof onEnd === "function") onEnd();
       };
       currentAudio.onerror = () => {
         cleanupCurrentAudio();
         pendingPlayback = null;
+        activeSpeechEngine = "";
         setXiaoWuVoiceStatus("");
         if (typeof onEnd === "function") onEnd();
       };
 
       try {
+        activeSpeechEngine = "azure";
         setXiaoWuVoiceStatus("🔊 正在回答……");
         await currentAudio.play();
         if (options.recordId) currentlySpeakingId = options.recordId;
@@ -645,7 +618,7 @@
       console.warn(debugPrefix, "Azure Speech unavailable, falling back to SpeechSynthesis", error);
       cleanupCurrentAudio();
       pendingPlayback = null;
-      return speakWithBrowserVoice(text, onEnd);
+      return speakWithBrowserVoice(text, onEnd, options);
     }
   }
 
@@ -670,12 +643,8 @@
               <option value="1.2">1.2x</option>
               <option value="1.5">1.5x</option>
               <option value="2">2.0x</option>
-            </select>
-          </label>
-          <label class="xiaowu-voice-select-wrap" for="xiaowuVoiceSelect">
-            <span>声音</span>
-            <select id="xiaowuVoiceSelect" aria-label="选择小吴老师声音">
-              <option value="auto-male">男声优先</option>
+              <option value="2.5">2.5x</option>
+              <option value="3">3.0x</option>
             </select>
           </label>
           <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="退出小吴老师">× 退出</button>
@@ -695,18 +664,13 @@
     document.querySelector("#xiaowuChatClose").addEventListener("click", closeChat);
     document.querySelector("#xiaowuAutoSpeechToggle").addEventListener("click", toggleAutoSpeech);
     document.querySelector("#xiaowuSpeechSpeedSelect").addEventListener("change", handleSpeechSpeedChange);
-    document.querySelector("#xiaowuVoiceSelect").addEventListener("change", handleVoiceSelectChange);
     document.querySelector("#xiaowuChatForm").addEventListener("submit", handleSubmit);
     document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
       console.log(debugPrefix, "send button clicked");
     });
     document.querySelector(".xiaowu-voice-button").addEventListener("click", toggleVoiceInput);
     document.querySelector("#xiaowuChatInput").addEventListener("keydown", handleInputKeydown);
-    populateVoiceSelect();
     updateSpeechSpeedSelect();
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
-    }
     startHistoryAutoSync();
     loadServerChatTime();
     flushPendingHistoryRecords();
@@ -775,50 +739,30 @@
 
   function handleSpeechSpeedChange(event) {
     const nextSpeed = Number(event.target.value);
-    xiaoWuVoiceSpeed = [0.8, 1, 1.2, 1.5, 2].includes(nextSpeed) ? nextSpeed : 1;
+    xiaoWuVoiceSpeed = speechSpeedOptions.includes(nextSpeed) ? nextSpeed : 1;
     localStorage.setItem(speechSpeedKey, String(xiaoWuVoiceSpeed));
+    applySpeechSpeedChange();
   }
 
-  function scoreVoiceForList(voice) {
-    const name = voice.name || "";
-    const maleWords = ["Eddy", "Reed", "Rocko", "Grandpa", "Otoya", "Yunxi", "Yunjian", "Yunyang", "Kangkang", "Danny", "Daniel", "Thomas", "Paul", "Mark", "David"];
-    const naturalWords = ["Natural", "Premium", "Enhanced", "Neural", "Online"];
-    const maleHit = maleWords.some((word) => name.toLowerCase().includes(word.toLowerCase()));
-    const naturalHit = naturalWords.some((word) => name.toLowerCase().includes(word.toLowerCase()));
-    const langScore = voice.lang?.startsWith("zh") ? 0 : voice.lang?.startsWith("ja") ? 1 : voice.lang?.startsWith("en") ? 2 : 3;
-    return (maleHit ? 0 : 20) + langScore + (naturalHit ? 0 : 5);
-  }
-
-  function populateVoiceSelect() {
-    const select = document.querySelector("#xiaowuVoiceSelect");
-    if (!select || !("speechSynthesis" in window)) return;
-
-    const voices = window.speechSynthesis.getVoices();
-    const currentValue = selectedVoiceURI || "auto-male";
-    select.innerHTML = '<option value="auto-male">男声优先</option>';
-
-    voices
-      .slice()
-      .sort((left, right) => scoreVoiceForList(left) - scoreVoiceForList(right))
-      .forEach((voice) => {
-        const option = document.createElement("option");
-        option.value = voice.voiceURI;
-        option.textContent = `${voice.name}｜${voice.lang || "unknown"}`;
-        select.appendChild(option);
-      });
-
-    if ([...select.options].some((option) => option.value === currentValue)) {
-      select.value = currentValue;
-    } else {
-      select.value = "auto-male";
-      selectedVoiceURI = "auto-male";
+  function applySpeechSpeedChange() {
+    if (currentAudio && activeSpeechEngine === "azure") {
+      currentAudio.playbackRate = xiaoWuVoiceSpeed;
+      setXiaoWuVoiceStatus("🔊 正在回答……");
+      renderHistory();
+      return;
     }
-  }
 
-  function handleVoiceSelectChange(event) {
-    selectedVoiceURI = event.target.value || "auto-male";
-    localStorage.setItem(voiceChoiceKey, selectedVoiceURI);
-    stopXiaoWuSpeech();
+    if (activeSpeechEngine === "browser" && "speechSynthesis" in window && window.speechSynthesis.speaking && activeBrowserSpeechText) {
+      const text = activeBrowserSpeechText;
+      const recordId = activeBrowserSpeechRecordId || currentlySpeakingId;
+      window.speechSynthesis.cancel();
+      currentlySpeakingId = recordId;
+      speakWithBrowserVoice(text, () => {
+        currentlySpeakingId = "";
+        renderHistory();
+      }, { recordId });
+      renderHistory();
+    }
   }
 
   async function toggleVoiceInput() {
@@ -1376,19 +1320,23 @@
       currentAudio = new Audio(currentAudioUrl);
     }
     currentAudio.volume = 1;
+    currentAudio.playbackRate = xiaoWuVoiceSpeed;
     currentAudio.onended = () => {
       cleanupCurrentAudio();
       pendingPlayback = null;
+      activeSpeechEngine = "";
       currentlySpeakingId = "";
       renderHistory();
     };
     currentAudio.onerror = () => {
       cleanupCurrentAudio();
       pendingPlayback = null;
+      activeSpeechEngine = "";
       currentlySpeakingId = "";
       renderHistory();
     };
     currentAudio.play().then(() => {
+      activeSpeechEngine = "azure";
       pendingPlayback = null;
       renderHistory();
     }).catch((error) => {
