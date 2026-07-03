@@ -1860,7 +1860,7 @@ body.xiaowu-chat-open {
 
 .xiaowu-chat-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: 12px;
   width: min(760px, 100%);
@@ -1912,7 +1912,8 @@ body.xiaowu-chat-open {
   color: #174f3d;
 }
 
-.xiaowu-voice-select-wrap {
+.xiaowu-voice-select-wrap,
+.xiaowu-speed-select-wrap {
   flex: 0 1 150px;
   display: grid;
   gap: 2px;
@@ -1922,7 +1923,8 @@ body.xiaowu-chat-open {
   font-weight: 900;
 }
 
-.xiaowu-voice-select-wrap select {
+.xiaowu-voice-select-wrap select,
+.xiaowu-speed-select-wrap select {
   width: 100%;
   min-height: 34px;
   padding: 5px 8px;
@@ -1933,6 +1935,28 @@ body.xiaowu-chat-open {
   font: inherit;
   font-size: 0.78rem;
   font-weight: 850;
+}
+
+.xiaowu-speed-select-wrap {
+  min-width: 88px;
+}
+
+.xiaowu-voice-status {
+  width: min(760px, calc(100% - 24px));
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0 12px;
+  background: #fffdf8;
+  color: #174f3d;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.xiaowu-voice-status.active {
+  min-height: 32px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #e4eadb;
 }
 
 .xiaowu-chat-close {
@@ -2283,14 +2307,19 @@ body.xiaowu-chat-open {
     max-width: 100%;
   }
 
-  .xiaowu-voice-select-wrap {
+  .xiaowu-voice-select-wrap,
+  .xiaowu-speed-select-wrap {
     grid-column: 1 / 2;
     width: min(100%, 260px);
   }
 
+  .xiaowu-speed-select-wrap {
+    width: min(100%, 140px);
+  }
+
   .xiaowu-chat-close {
     grid-column: 2 / 3;
-    grid-row: 1 / 4;
+    grid-row: 1 / 5;
     align-self: start;
     min-width: 68px;
   }

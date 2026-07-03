@@ -4,6 +4,7 @@
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const voiceChoiceKey = "takken_xiaowu_teacher_voice_uri_v1";
+  const speechSpeedKey = "takken_xiaowu_teacher_speech_speed_v1";
   const chatTodayTimeKey = "takken_today_xiaowu_chat_seconds_v1";
   const chatTotalTimeKey = "takken_total_xiaowu_chat_seconds_v1";
   const chatTimeDateKey = "takken_today_xiaowu_chat_date_v1";
@@ -13,7 +14,6 @@
   const ttsEndpoint = "/api/xiaowu-tts";
   const xiaoWuTtsEngine = "azure";
   const xiaoWuVoiceName = "zh-CN-YunxiNeural";
-  const xiaoWuVoiceSpeed = 1;
   const maxHistoryForApi = 8;
   const debugPrefix = "[XiaoWu Teacher Chat]";
 
@@ -52,6 +52,8 @@
   let currentAudioUrl = "";
   let pendingPlayback = null;
   let selectedVoiceURI = localStorage.getItem(voiceChoiceKey) || "auto-male";
+  let xiaoWuVoiceSpeed = Number(localStorage.getItem(speechSpeedKey)) || 1;
+  if (![0.8, 1, 1.2, 1.5, 2].includes(xiaoWuVoiceSpeed)) xiaoWuVoiceSpeed = 1;
   let pageScrollBeforeChat = 0;
   let chatTimerId = null;
   let chatLastTick = null;
@@ -455,6 +457,24 @@
     renderHistory();
   }
 
+  function setXiaoWuVoiceStatus(message = "") {
+    const status = document.querySelector("#xiaowuVoiceStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("active", Boolean(message));
+  }
+
+  async function getMicrophonePermissionState() {
+    if (!navigator.permissions?.query) return "unknown";
+    try {
+      const result = await navigator.permissions.query({ name: "microphone" });
+      return result.state || "unknown";
+    } catch (error) {
+      console.warn(debugPrefix, "microphone permission query unavailable", error);
+      return "unknown";
+    }
+  }
+
   function stripForSpeech(text) {
     return String(text || "")
       .replace(/```[\s\S]*?```/g, " ")
@@ -475,6 +495,7 @@
   function cleanupCurrentAudio() {
     if (currentAudio) {
       currentAudio.pause();
+      currentAudio.currentTime = 0;
       currentAudio.src = "";
       currentAudio = null;
     }
@@ -538,15 +559,18 @@
     } else {
       utterance.lang = "zh-CN";
     }
-    utterance.rate = 1;
+    utterance.rate = xiaoWuVoiceSpeed;
     utterance.pitch = 1.05;
     utterance.volume = 1;
     utterance.onend = () => {
+      setXiaoWuVoiceStatus("");
       if (typeof onEnd === "function") onEnd();
     };
     utterance.onerror = () => {
+      setXiaoWuVoiceStatus("");
       if (typeof onEnd === "function") onEnd();
     };
+    setXiaoWuVoiceStatus("🔊 正在回答……");
     window.speechSynthesis.speak(utterance);
     return true;
   }
@@ -588,15 +612,18 @@
       currentAudio.onended = () => {
         cleanupCurrentAudio();
         pendingPlayback = null;
+        setXiaoWuVoiceStatus("");
         if (typeof onEnd === "function") onEnd();
       };
       currentAudio.onerror = () => {
         cleanupCurrentAudio();
         pendingPlayback = null;
+        setXiaoWuVoiceStatus("");
         if (typeof onEnd === "function") onEnd();
       };
 
       try {
+        setXiaoWuVoiceStatus("🔊 正在回答……");
         await currentAudio.play();
         if (options.recordId) currentlySpeakingId = options.recordId;
         pendingPlayback = null;
@@ -610,6 +637,7 @@
           audioUrl: currentAudioUrl
         };
         currentlySpeakingId = "";
+        setXiaoWuVoiceStatus("");
         renderHistory();
         return false;
       }
@@ -634,6 +662,16 @@
             <span>只陪小7学宅建。</span>
           </div>
           <button class="xiaowu-auto-speech-toggle" id="xiaowuAutoSpeechToggle" type="button" aria-pressed="${autoSpeechEnabled ? "true" : "false"}">${autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关"}</button>
+          <label class="xiaowu-speed-select-wrap" for="xiaowuSpeechSpeedSelect">
+            <span>🔊 语速</span>
+            <select id="xiaowuSpeechSpeedSelect" aria-label="选择小吴老师朗读语速">
+              <option value="0.8">0.8x</option>
+              <option value="1">1.0x</option>
+              <option value="1.2">1.2x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2.0x</option>
+            </select>
+          </label>
           <label class="xiaowu-voice-select-wrap" for="xiaowuVoiceSelect">
             <span>声音</span>
             <select id="xiaowuVoiceSelect" aria-label="选择小吴老师声音">
@@ -642,9 +680,10 @@
           </label>
           <button class="xiaowu-chat-close" id="xiaowuChatClose" type="button" aria-label="退出小吴老师">× 退出</button>
         </header>
+        <div class="xiaowu-voice-status" id="xiaowuVoiceStatus" aria-live="polite"></div>
         <div class="xiaowu-chat-history" id="xiaowuChatHistory"></div>
         <form class="xiaowu-chat-form" id="xiaowuChatForm">
-          <button class="xiaowu-voice-button" type="button" aria-label="语音功能预留">🎤</button>
+          <button class="xiaowu-voice-button" type="button" aria-label="语音输入">🎤</button>
           <textarea id="xiaowuChatInput" rows="2" placeholder="小7，问我宅建问题就好。比如：契約不適合責任怎么记？"></textarea>
           <button class="xiaowu-send-button" id="xiaowuChatSend" type="submit">发送</button>
         </form>
@@ -655,6 +694,7 @@
     document.querySelector("#xiaowuChatFab").addEventListener("click", openChat);
     document.querySelector("#xiaowuChatClose").addEventListener("click", closeChat);
     document.querySelector("#xiaowuAutoSpeechToggle").addEventListener("click", toggleAutoSpeech);
+    document.querySelector("#xiaowuSpeechSpeedSelect").addEventListener("change", handleSpeechSpeedChange);
     document.querySelector("#xiaowuVoiceSelect").addEventListener("change", handleVoiceSelectChange);
     document.querySelector("#xiaowuChatForm").addEventListener("submit", handleSubmit);
     document.querySelector("#xiaowuChatSend").addEventListener("click", () => {
@@ -663,6 +703,7 @@
     document.querySelector(".xiaowu-voice-button").addEventListener("click", toggleVoiceInput);
     document.querySelector("#xiaowuChatInput").addEventListener("keydown", handleInputKeydown);
     populateVoiceSelect();
+    updateSpeechSpeedSelect();
     if ("speechSynthesis" in window) {
       window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
     }
@@ -684,7 +725,16 @@
     loadServerChatTime();
     flushPendingHistoryRecords();
     loadServerHistory();
+    checkMicrophonePermissionForChat();
     setTimeout(() => document.querySelector("#xiaowuChatInput")?.focus(), 50);
+  }
+
+  async function checkMicrophonePermissionForChat() {
+    const permissionState = await getMicrophonePermissionState();
+    console.log(debugPrefix, "microphone permission state", permissionState);
+    if (permissionState === "denied") {
+      showChatNotice("🌸 小7，请到浏览器设置开启麦克风权限。");
+    }
   }
 
   function closeChat() {
@@ -715,6 +765,18 @@
     if (!toggle) return;
     toggle.textContent = autoSpeechEnabled ? "🔊 自动朗读：开" : "🔇 自动朗读：关";
     toggle.setAttribute("aria-pressed", autoSpeechEnabled ? "true" : "false");
+  }
+
+  function updateSpeechSpeedSelect() {
+    const select = document.querySelector("#xiaowuSpeechSpeedSelect");
+    if (!select) return;
+    select.value = String(xiaoWuVoiceSpeed);
+  }
+
+  function handleSpeechSpeedChange(event) {
+    const nextSpeed = Number(event.target.value);
+    xiaoWuVoiceSpeed = [0.8, 1, 1.2, 1.5, 2].includes(nextSpeed) ? nextSpeed : 1;
+    localStorage.setItem(speechSpeedKey, String(xiaoWuVoiceSpeed));
   }
 
   function scoreVoiceForList(voice) {
@@ -759,7 +821,7 @@
     stopXiaoWuSpeech();
   }
 
-  function toggleVoiceInput() {
+  async function toggleVoiceInput() {
     if (voiceInputActive || isListening) {
       stopVoiceInput();
       return;
@@ -767,16 +829,14 @@
     const isInterruptingSpeech = Boolean(currentlySpeakingId || currentAudio || ("speechSynthesis" in window && window.speechSynthesis.speaking));
     if (isInterruptingSpeech) {
       stopXiaoWuSpeech();
-      startVoiceInput({ autoSend: true });
+      await startVoiceInput({ autoSend: true });
       return;
     }
-    startVoiceInput();
+    await startVoiceInput();
   }
 
-  function startVoiceInput(options = {}) {
+  async function startVoiceInput(options = {}) {
     const Recognition = getSpeechRecognitionConstructor();
-    const voiceButton = document.querySelector(".xiaowu-voice-button");
-    const input = document.querySelector("#xiaowuChatInput");
     const listeningMessage = options.autoSend ? "🎙️ 小吴先听小7说，听完会自动发送。" : "🎙️ 正在听小7说话……";
 
     if (!Recognition) {
@@ -785,22 +845,30 @@
     }
 
     stopVoiceInput({ silent: true, forceAbort: true });
+    stopXiaoWuSpeech({ silent: true });
+
+    const permissionState = await getMicrophonePermissionState();
+    if (permissionState === "denied") {
+      showChatNotice("🌸 小7，请到浏览器设置开启麦克风权限。");
+      setXiaoWuVoiceStatus("");
+      return;
+    }
 
     const sessionId = Date.now();
     voiceSessionId = sessionId;
     voiceInputActive = true;
     voiceAutoSend = Boolean(options.autoSend);
-    startRecognitionSession(Recognition, sessionId, listeningMessage);
+    startRecognitionSession(Recognition, sessionId, listeningMessage, permissionState);
   }
 
-  function startRecognitionSession(Recognition, sessionId, listeningMessage) {
+  function startRecognitionSession(Recognition, sessionId, listeningMessage, permissionState = "unknown") {
     const voiceButton = document.querySelector(".xiaowu-voice-button");
     const input = document.querySelector("#xiaowuChatInput");
-    let activeRecognition = new Recognition();
+    const activeRecognition = new Recognition();
     recognition = activeRecognition;
     activeRecognition.lang = getSpeechLanguage();
     activeRecognition.interimResults = true;
-    activeRecognition.continuous = true;
+    activeRecognition.continuous = false;
     activeRecognition.maxAlternatives = 1;
 
     const originalValue = input?.value || "";
@@ -818,6 +886,7 @@
         voiceButton.title = voiceAutoSend ? "小吴正在听小7插话，停顿后会自动发送。" : "正在听小7说话……";
       }
       document.querySelector("#xiaowuChatForm")?.classList.add("listening");
+      setXiaoWuVoiceStatus("🎤 正在听……");
       showChatNotice(listeningMessage);
     };
 
@@ -846,7 +915,7 @@
       console.error(debugPrefix, "speech recognition failed", event);
       const errorMessages = {
         "audio-capture": "🌸 小7，没有找到麦克风。可以检查一下浏览器麦克风权限。",
-        "not-allowed": "🌸 小7，麦克风权限还没有打开。请允许浏览器使用麦克风后再试一次。",
+        "not-allowed": "🌸 小7，请到浏览器设置开启麦克风权限。",
         "service-not-allowed": "🌸 小7，浏览器暂时不允许语音输入，可以先打字问小吴老师。",
         "no-speech": "🌸 小7，这次没有听到声音，小吴还在继续听。",
         "network": "🌸 小7，语音识别网络有点卡，可以再试一次。"
@@ -855,28 +924,18 @@
       showChatNotice(voiceErrorMessage);
       const fatalErrors = ["audio-capture", "not-allowed", "service-not-allowed"];
       if (fatalErrors.includes(event.error)) {
-        voiceInputActive = false;
-        voiceAutoSend = false;
         resetVoiceInputState({ keepNotice: true, sessionId });
       }
     };
 
     activeRecognition.onend = () => {
       if (voiceSessionId !== sessionId) return;
-      cleanupRecognitionHandlers();
+      cleanupRecognitionHandlers(activeRecognition);
       recognition = null;
       isListening = false;
 
       if (sessionFinalTranscript.trim()) {
         clearChatNotice(listeningMessage);
-      }
-
-      if (voiceInputActive) {
-        window.setTimeout(() => {
-          if (voiceSessionId !== sessionId || !voiceInputActive) return;
-          startRecognitionSession(Recognition, sessionId, listeningMessage);
-        }, hadResult ? 180 : 450);
-        return;
       }
 
       resetVoiceInputState({ keepNotice: Boolean(voiceErrorMessage) || !hadResult, sessionId });
@@ -887,8 +946,9 @@
       activeRecognition.start();
     } catch (error) {
       console.error(debugPrefix, "speech recognition start failed", error);
-      showChatNotice("🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
-      voiceInputActive = false;
+      showChatNotice(permissionState === "prompt"
+        ? "🌸 小7，请允许浏览器使用麦克风后再试一次。"
+        : "🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
       resetVoiceInputState({ keepNotice: true, sessionId });
     }
   }
@@ -900,26 +960,25 @@
     const activeRecognition = recognition;
     if (activeRecognition) {
       try {
-        if (options.forceAbort || !isListening) {
-          activeRecognition.abort();
-        } else {
-          activeRecognition.stop();
-        }
+        activeRecognition.abort();
       } catch (error) {
-        console.error(debugPrefix, "speech recognition stop failed", error);
+        console.error(debugPrefix, "speech recognition abort failed", error);
+      }
+      try {
+        activeRecognition.stop();
+      } catch (error) {
+        console.error(debugPrefix, "speech recognition stop cleanup failed", error);
       }
     }
-    if (options.forceAbort || !isListening) {
-      resetVoiceInputState(options);
-    }
+    resetVoiceInputState(options);
   }
 
-  function cleanupRecognitionHandlers() {
-    if (recognition) {
-      recognition.onstart = null;
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
+  function cleanupRecognitionHandlers(targetRecognition = recognition) {
+    if (targetRecognition) {
+      targetRecognition.onstart = null;
+      targetRecognition.onresult = null;
+      targetRecognition.onerror = null;
+      targetRecognition.onend = null;
     }
   }
 
@@ -954,6 +1013,7 @@
     isListening = false;
     voiceInputActive = false;
     voiceAutoSend = false;
+    setXiaoWuVoiceStatus("");
     if (voiceButton) {
       voiceButton.classList.remove("listening");
       voiceButton.textContent = "🎤";
@@ -961,7 +1021,10 @@
       voiceButton.title = "";
     }
     document.querySelector("#xiaowuChatForm")?.classList.remove("listening");
-    if (!options.keepNotice) clearChatNotice("🎙️ 正在听小7说话……");
+    if (!options.keepNotice && historySyncMessage.startsWith("🎙️")) {
+      historySyncMessage = "";
+      renderHistory();
+    }
   }
 
   function handleInputKeydown(event) {
@@ -995,6 +1058,7 @@
     saveServerRecord(record);
     input.value = "";
     setSending(true);
+    setXiaoWuVoiceStatus("🧠 正在思考……");
     renderHistory();
     scrollHistoryToBottom();
 
@@ -1030,6 +1094,8 @@
         lessonLinks: normalizeLessonLinks(data.lessonLinks),
         status: response.ok ? "done" : "error"
       });
+      renderHistory();
+      scrollHistoryToBottom();
       maybeAutoSpeak(record.id, answer);
       await saveServerRecord({ ...record, answer, lessonLinks: normalizeLessonLinks(data.lessonLinks), status: response.ok ? "done" : "error" });
     } catch (error) {
@@ -1042,6 +1108,8 @@
         lessonLinks: [],
         status: "error"
       });
+      renderHistory();
+      scrollHistoryToBottom();
       maybeAutoSpeak(record.id, "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。");
       await saveServerRecord({
         ...record,
@@ -1265,6 +1333,7 @@
       sendButton.textContent = nextValue ? "思考中" : "发送";
     }
     if (input) input.disabled = nextValue;
+    if (!nextValue && !currentlySpeakingId && !isListening) setXiaoWuVoiceStatus("");
   }
 
   function toggleAnswerSpeech(record) {
@@ -1280,7 +1349,7 @@
 
   function maybeAutoSpeak(recordId, answer) {
     if (!autoSpeechEnabled || !isOpen) return;
-    startAnswerSpeech(recordId, answer);
+    requestAnimationFrame(() => startAnswerSpeech(recordId, answer));
   }
 
   function startAnswerSpeech(recordId, answer) {
@@ -1339,6 +1408,7 @@
     cleanupCurrentAudio();
     if (!options.keepPending) pendingPlayback = null;
     currentlySpeakingId = "";
+    setXiaoWuVoiceStatus("");
     if (!options.silent) renderHistory();
   }
 
