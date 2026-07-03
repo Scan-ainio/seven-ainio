@@ -446,6 +446,15 @@
     }
   }
 
+  function showCloudMemoryError(context, details = {}) {
+    historySyncMessage = "小吴老师云端记忆还没有连接成功 🌸";
+    console.error(debugPrefix, `cloud memory ${context} failed`, {
+      url: historyEndpoint,
+      ...details
+    });
+    renderHistory();
+  }
+
   function stripForSpeech(text) {
     return String(text || "")
       .replace(/```[\s\S]*?```/g, " ")
@@ -1061,7 +1070,10 @@
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok || !Array.isArray(data.records)) {
-        throw new Error(data.message || `History request failed with ${response.status}`);
+        const error = new Error(data.message || `History request failed with ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
 
       chatRecords = mergeRecords(readRecords(), data.records);
@@ -1075,13 +1087,14 @@
         records: data.records.length
       });
     } catch (error) {
-      console.error(debugPrefix, "history fetch failed", {
-        url: historyEndpoint,
+      showCloudMemoryError("GET /api/xiaowu-history", {
+        status: error.status,
+        serverError: error.data?.error,
+        serverMessage: error.data?.message,
+        detail: error.data?.detail,
         error
       });
-      historySyncMessage = "小吴老师正在同步历史记录 🌸";
       chatRecords = mergeRecords(chatRecords, readRecords());
-      renderHistory();
     } finally {
       isHistoryLoading = false;
     }
@@ -1156,7 +1169,10 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.message || `History save failed with ${response.status}`);
+        const error = new Error(data.message || `History save failed with ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
       historySyncMessage = "";
       removePendingHistoryRecord(record.id);
@@ -1167,15 +1183,62 @@
       });
       return true;
     } catch (error) {
-      console.error(debugPrefix, "history save failed", {
-        url: historyEndpoint,
+      showCloudMemoryError("POST /api/xiaowu-history", {
+        status: error.status,
+        serverError: error.data?.error,
+        serverMessage: error.data?.message,
+        detail: error.data?.detail,
         error
       });
-      historySyncMessage = "小吴老师正在同步历史记录 🌸";
-      renderHistory();
       return false;
     }
   }
+
+  window.xiaoWuCheckCloudMemory = async function xiaoWuCheckCloudMemory() {
+    const testId = `cloud-test-${Date.now()}`;
+    const report = {
+      endpoint: historyEndpoint,
+      getBefore: null,
+      post: null,
+      getAfter: null
+    };
+
+    async function readResponse(response) {
+      const data = await response.json().catch(() => ({}));
+      return {
+        ok: response.ok,
+        status: response.status,
+        error: data.error || "",
+        message: data.message || "",
+        detail: data.detail || "",
+        recordsCount: Array.isArray(data.records) ? data.records.length : data.recordsCount
+      };
+    }
+
+    try {
+      report.getBefore = await readResponse(await fetch(historyEndpoint, { headers: { "Accept": "application/json" } }));
+      report.post = await readResponse(await fetch(historyEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: testId,
+          question: "云端记忆连接测试",
+          answer: "云端记忆测试成功",
+          status: "done",
+          createdAt: new Date().toISOString(),
+          lessonId: getCurrentLessonId(),
+          deviceInfo: getDeviceInfo()
+        })
+      }));
+      report.getAfter = await readResponse(await fetch(historyEndpoint, { headers: { "Accept": "application/json" } }));
+      console.log(debugPrefix, "cloud memory check", report);
+      return report;
+    } catch (error) {
+      report.error = String(error?.message || error);
+      console.error(debugPrefix, "cloud memory check failed", report);
+      return report;
+    }
+  };
 
   function normalizeLessonLinks(links) {
     if (!Array.isArray(links)) return [];

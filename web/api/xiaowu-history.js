@@ -185,7 +185,8 @@ module.exports = async function handler(req, res) {
     const status = error.code === "KV_NOT_CONFIGURED" ? 500 : 502;
     sendJson(res, status, {
       error: error.code || "HISTORY_SYNC_FAILED",
-      message: "小吴老师正在同步历史记录 🌸",
+      message: "小吴老师云端记忆还没有连接成功 🌸",
+      detail: error.message,
       records: []
     });
   }
