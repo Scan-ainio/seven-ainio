@@ -8,16 +8,27 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function parseBody(req) {
-  if (!req.body) return {};
-  if (typeof req.body === "string") {
-    try {
-      return JSON.parse(req.body);
-    } catch {
-      return {};
+async function parseBody(req) {
+  if (req.body) {
+    if (typeof req.body === "string") {
+      try {
+        return JSON.parse(req.body);
+      } catch {
+        return {};
+      }
     }
+    return req.body;
   }
-  return req.body;
+
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return {};
+
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function normalizeText(value, maxLength = 8000) {
@@ -99,6 +110,8 @@ function normalizeLessonLinks(value) {
 
 function normalizeRecord(input) {
   const now = new Date().toISOString();
+  const status = normalizeText(input.status, 20);
+
   return {
     id: normalizeText(input.id, 80) || `chat-${Date.now()}`,
     userId: USER_ID,
@@ -107,13 +120,26 @@ function normalizeRecord(input) {
     lessonLinks: normalizeLessonLinks(input.lessonLinks),
     createdAt: normalizeText(input.createdAt, 40) || now,
     lessonId: normalizeText(input.lessonId || input.currentLessonId, 60),
-    deviceInfo: normalizeText(input.deviceInfo, 500)
+    deviceInfo: normalizeText(input.deviceInfo, 500),
+    status: ["sending", "done", "error"].includes(status) ? status : (input.answer ? "done" : "sending"),
+    updatedAt: now
   };
 }
 
 function mergeRecord(records, record) {
-  const withoutSame = records.filter((item) => item.id !== record.id);
-  return [...withoutSame, record].sort((a, b) => {
+  const existing = records.find((item) => item.id === record.id);
+  const merged = existing
+    ? {
+        ...existing,
+        ...record,
+        answer: record.answer || existing.answer || "",
+        lessonLinks: record.lessonLinks?.length ? record.lessonLinks : (existing.lessonLinks || []),
+        status: record.answer ? record.status : (existing.status || record.status)
+      }
+    : record;
+  const withoutSame = records.filter((item) => item.id !== merged.id);
+
+  return [...withoutSame, merged].sort((a, b) => {
     const left = new Date(a.createdAt).getTime() || 0;
     const right = new Date(b.createdAt).getTime() || 0;
     return left - right;
@@ -139,11 +165,11 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const body = parseBody(req);
+      const body = await parseBody(req);
       const record = normalizeRecord(body);
 
-      if (!record.question || !record.answer) {
-        sendJson(res, 400, { error: "question and answer are required" });
+      if (!record.question) {
+        sendJson(res, 400, { error: "question is required" });
         return;
       }
 

@@ -1,5 +1,6 @@
 (() => {
   const storageKey = "takken_xiaowu_teacher_chat_v2";
+  const pendingHistoryKey = "takken_xiaowu_teacher_pending_history_v1";
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const voiceChoiceKey = "takken_xiaowu_teacher_voice_uri_v1";
@@ -57,6 +58,7 @@
   let pendingServerChatSeconds = 0;
   let isChatTimeSyncing = false;
   let lastChatTimeSyncAt = 0;
+  let historyAutoSyncTimerId = null;
 
   function readRecords() {
     try {
@@ -69,6 +71,30 @@
 
   function saveRecords() {
     localStorage.setItem(storageKey, JSON.stringify(chatRecords));
+  }
+
+  function readPendingHistoryRecords() {
+    try {
+      const value = JSON.parse(localStorage.getItem(pendingHistoryKey));
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writePendingHistoryRecords(records) {
+    localStorage.setItem(pendingHistoryKey, JSON.stringify(records.slice(-80)));
+  }
+
+  function queuePendingHistoryRecord(record) {
+    if (!record?.id || !record.question) return;
+    const current = readPendingHistoryRecords().filter((item) => item.id !== record.id);
+    writePendingHistoryRecords([...current, record]);
+  }
+
+  function removePendingHistoryRecord(recordId) {
+    if (!recordId) return;
+    writePendingHistoryRecords(readPendingHistoryRecords().filter((item) => item.id !== recordId));
   }
 
   function getTodayKey() {
@@ -225,11 +251,27 @@
     notifyChatTimeUpdated();
   }
 
+  function mergeRecordFields(existingRecord, nextRecord) {
+    if (!existingRecord) return nextRecord;
+    if (!nextRecord) return existingRecord;
+
+    const existingHasAnswer = Boolean(existingRecord.answer);
+    const nextHasAnswer = Boolean(nextRecord.answer);
+
+    return {
+      ...existingRecord,
+      ...nextRecord,
+      answer: nextHasAnswer ? nextRecord.answer : (existingRecord.answer || ""),
+      lessonLinks: nextRecord.lessonLinks?.length ? nextRecord.lessonLinks : (existingRecord.lessonLinks || []),
+      status: nextHasAnswer ? (nextRecord.status || "done") : (existingHasAnswer ? (existingRecord.status || "done") : (nextRecord.status || existingRecord.status || "sending"))
+    };
+  }
+
   function mergeRecords(primaryRecords, secondaryRecords) {
     const recordsById = new Map();
     [...primaryRecords, ...secondaryRecords].forEach((record) => {
       if (!record?.id) return;
-      recordsById.set(record.id, { ...recordsById.get(record.id), ...record });
+      recordsById.set(record.id, mergeRecordFields(recordsById.get(record.id), record));
     });
     return Array.from(recordsById.values()).sort((left, right) => {
       const leftTime = new Date(left.createdAt).getTime() || 0;
@@ -615,7 +657,9 @@
     if ("speechSynthesis" in window) {
       window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
     }
+    startHistoryAutoSync();
     loadServerChatTime();
+    flushPendingHistoryRecords();
     renderHistory();
   }
 
@@ -629,6 +673,7 @@
     startChatTimer();
     renderHistory();
     loadServerChatTime();
+    flushPendingHistoryRecords();
     loadServerHistory();
     setTimeout(() => document.querySelector("#xiaowuChatInput")?.focus(), 50);
   }
@@ -938,6 +983,7 @@
     chatRecords = [...chatRecords, record];
     expandedIds = new Set([record.id]);
     saveRecords();
+    saveServerRecord(record);
     input.value = "";
     setSending(true);
     renderHistory();
@@ -976,7 +1022,7 @@
         status: response.ok ? "done" : "error"
       });
       maybeAutoSpeak(record.id, answer);
-      saveServerRecord({ ...record, answer, lessonLinks: normalizeLessonLinks(data.lessonLinks), status: response.ok ? "done" : "error" });
+      await saveServerRecord({ ...record, answer, lessonLinks: normalizeLessonLinks(data.lessonLinks), status: response.ok ? "done" : "error" });
     } catch (error) {
       console.error(debugPrefix, "fetch failed", {
         url: apiEndpoint,
@@ -988,7 +1034,7 @@
         status: "error"
       });
       maybeAutoSpeak(record.id, "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。");
-      saveServerRecord({
+      await saveServerRecord({
         ...record,
         answer: "🌸 小7，小吴老师现在连不上课堂。请确认后端接口已经启动，再问我一次。",
         lessonLinks: [],
@@ -1041,15 +1087,62 @@
     }
   }
 
-  async function saveServerRecord(record) {
-    if (!record?.question || !record?.answer) return;
+  async function flushPendingHistoryRecords() {
+    const pendingRecords = readPendingHistoryRecords();
+    if (!pendingRecords.length) return;
+
+    console.log(debugPrefix, "history pending sync start", {
+      url: historyEndpoint,
+      count: pendingRecords.length
+    });
+
+    for (const record of pendingRecords) {
+      await saveServerRecord(record, { alreadyQueued: true });
+    }
+  }
+
+  function startHistoryAutoSync() {
+    if (historyAutoSyncTimerId) return;
+    historyAutoSyncTimerId = window.setInterval(() => {
+      flushPendingHistoryRecords();
+    }, 10000);
+  }
+
+  function flushPendingHistoryRecordsWithBeacon() {
+    if (!navigator.sendBeacon) return;
+    const pendingRecords = readPendingHistoryRecords();
+    if (!pendingRecords.length) return;
+
+    pendingRecords.forEach((record) => {
+      if (!record?.question) return;
+      const payload = JSON.stringify({
+        id: record.id,
+        question: record.question,
+        answer: record.answer || "",
+        lessonLinks: normalizeLessonLinks(record.lessonLinks),
+        createdAt: record.createdAt,
+        status: record.status || (record.answer ? "done" : "sending"),
+        lessonId: getCurrentLessonId(),
+        deviceInfo: getDeviceInfo()
+      });
+      navigator.sendBeacon(historyEndpoint, new Blob([payload], { type: "application/json" }));
+    });
+  }
+
+  async function saveServerRecord(record, options = {}) {
+    if (!record?.question) return false;
+
+    if (!options.alreadyQueued) {
+      queuePendingHistoryRecord(record);
+    }
 
     const payload = {
       id: record.id,
       question: record.question,
-      answer: record.answer,
+      answer: record.answer || "",
       lessonLinks: normalizeLessonLinks(record.lessonLinks),
       createdAt: record.createdAt,
+      status: record.status || (record.answer ? "done" : "sending"),
       lessonId: getCurrentLessonId(),
       deviceInfo: getDeviceInfo()
     };
@@ -1058,17 +1151,21 @@
       const response = await fetch(historyEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        keepalive: true
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.message || `History save failed with ${response.status}`);
       }
       historySyncMessage = "";
+      removePendingHistoryRecord(record.id);
       console.log(debugPrefix, "history save complete", {
         url: historyEndpoint,
-        status: response.status
+        status: response.status,
+        recordsCount: data.recordsCount
       });
+      return true;
     } catch (error) {
       console.error(debugPrefix, "history save failed", {
         url: historyEndpoint,
@@ -1076,6 +1173,7 @@
       });
       historySyncMessage = "小吴老师正在同步历史记录 🌸";
       renderHistory();
+      return false;
     }
   }
 
@@ -1293,5 +1391,9 @@
     }
   });
 
-  window.addEventListener("beforeunload", stopChatTimer);
+  window.addEventListener("beforeunload", () => {
+    flushPendingHistoryRecordsWithBeacon();
+    stopChatTimer();
+  });
+  window.addEventListener("pagehide", flushPendingHistoryRecordsWithBeacon);
 })();
