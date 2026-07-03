@@ -8,6 +8,7 @@
   const chatTimeDateKey = "takken_today_xiaowu_chat_date_v1";
   const apiEndpoint = "/api/xiaowu-chat";
   const historyEndpoint = "/api/xiaowu-history";
+  const chatTimeEndpoint = "/api/xiaowu-chat-time";
   const ttsEndpoint = "/api/xiaowu-tts";
   const xiaoWuTtsEngine = "azure";
   const xiaoWuVoiceName = "zh-CN-YunxiNeural";
@@ -53,6 +54,9 @@
   let pageScrollBeforeChat = 0;
   let chatTimerId = null;
   let chatLastTick = null;
+  let pendingServerChatSeconds = 0;
+  let isChatTimeSyncing = false;
+  let lastChatTimeSyncAt = 0;
 
   function readRecords() {
     try {
@@ -97,6 +101,87 @@
     window.dispatchEvent(new CustomEvent("xiaowu-chat-time-updated"));
   }
 
+  function applyServerChatTime(data) {
+    if (!data || typeof data !== "object") return;
+    const today = getTodayKey();
+    if (data.date === today) {
+      localStorage.setItem(chatTimeDateKey, today);
+      writeNumberStorage(chatTodayTimeKey, Number(data.todaySeconds) || 0);
+    }
+    writeNumberStorage(chatTotalTimeKey, Number(data.totalSeconds) || 0);
+    notifyChatTimeUpdated();
+  }
+
+  async function loadServerChatTime() {
+    const date = getTodayKey();
+    try {
+      const response = await fetch(`${chatTimeEndpoint}?date=${encodeURIComponent(date)}`, {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || `Chat time request failed with ${response.status}`);
+      applyServerChatTime(data);
+      console.log(debugPrefix, "chat time fetch complete", {
+        url: chatTimeEndpoint,
+        status: response.status,
+        todaySeconds: data.todaySeconds,
+        totalSeconds: data.totalSeconds
+      });
+    } catch (error) {
+      console.error(debugPrefix, "chat time fetch failed", {
+        url: chatTimeEndpoint,
+        error
+      });
+      notifyChatTimeUpdated();
+    }
+  }
+
+  function flushServerChatTime(options = {}) {
+    if (!pendingServerChatSeconds || isChatTimeSyncing) return;
+    const deltaSeconds = pendingServerChatSeconds;
+    const date = getTodayKey();
+    const payload = JSON.stringify({ deltaSeconds, date });
+
+    pendingServerChatSeconds = 0;
+    lastChatTimeSyncAt = Date.now();
+
+    if (options.beacon && navigator.sendBeacon) {
+      const blob = new Blob([payload], { type: "application/json" });
+      const queued = navigator.sendBeacon(chatTimeEndpoint, blob);
+      if (!queued) pendingServerChatSeconds += deltaSeconds;
+      return;
+    }
+
+    isChatTimeSyncing = true;
+    fetch(chatTimeEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: Boolean(options.keepalive)
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || `Chat time save failed with ${response.status}`);
+        applyServerChatTime(data);
+        console.log(debugPrefix, "chat time save complete", {
+          url: chatTimeEndpoint,
+          status: response.status,
+          deltaSeconds
+        });
+      })
+      .catch((error) => {
+        pendingServerChatSeconds += deltaSeconds;
+        console.error(debugPrefix, "chat time save failed", {
+          url: chatTimeEndpoint,
+          error
+        });
+      })
+      .finally(() => {
+        isChatTimeSyncing = false;
+      });
+  }
+
   function saveChatTimeDelta() {
     if (!isOpen || !chatLastTick) return;
 
@@ -107,8 +192,13 @@
     ensureChatTimeDate();
     writeNumberStorage(chatTodayTimeKey, readNumberStorage(chatTodayTimeKey) + deltaSeconds);
     writeNumberStorage(chatTotalTimeKey, readNumberStorage(chatTotalTimeKey) + deltaSeconds);
+    pendingServerChatSeconds += deltaSeconds;
     chatLastTick += deltaSeconds * 1000;
     notifyChatTimeUpdated();
+
+    if (pendingServerChatSeconds >= 5 || Date.now() - lastChatTimeSyncAt > 10000) {
+      flushServerChatTime();
+    }
   }
 
   function startChatTimer() {
@@ -126,6 +216,7 @@
 
   function stopChatTimer() {
     saveChatTimeDelta();
+    flushServerChatTime({ keepalive: true, beacon: true });
     chatLastTick = null;
     if (chatTimerId) {
       clearInterval(chatTimerId);
@@ -524,6 +615,7 @@
     if ("speechSynthesis" in window) {
       window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
     }
+    loadServerChatTime();
     renderHistory();
   }
 
@@ -536,6 +628,7 @@
     document.querySelector("#xiaowuChatFab").setAttribute("aria-expanded", "true");
     startChatTimer();
     renderHistory();
+    loadServerChatTime();
     loadServerHistory();
     setTimeout(() => document.querySelector("#xiaowuChatInput")?.focus(), 50);
   }
