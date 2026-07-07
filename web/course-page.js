@@ -63,7 +63,14 @@ const lessonSequence = [
   { lessonId: "lesson-010", title: "土地题为什么也不用死背？", status: "ready" },
   { lessonId: "lesson-011", title: "广告有没有骗人？景品表示法这样学就够了", status: "ready" },
   { lessonId: "lesson-012", title: "住宅金融支援機構到底在支援谁？", status: "ready" },
-  { lessonId: "lesson-013", title: "小吴正在准备中", status: "pending" }
+  { lessonId: "lesson-013", title: "不動産鑑定評価，为什么反而适合关键词拿分？", status: "ready" },
+  { lessonId: "lesson-014", title: "地価公示法，国家为什么每年公布土地价格？", status: "ready" },
+  { lessonId: "lesson-015", title: "贈与税，为什么只抓住宅取得資金就够了？", status: "ready" },
+  { lessonId: "lesson-016", title: "登録免許税，什么时候缴、什么时候不缴？", status: "ready" },
+  { lessonId: "lesson-017", title: "印紙税，哪些文书要贴印纸？", status: "ready" },
+  { lessonId: "lesson-018", title: "所得税，不要算税，只抓特例", status: "ready" },
+  { lessonId: "lesson-019", title: "地価公示法，流程记住就能拿分", status: "ready" },
+  { lessonId: "lesson-020", title: "小吴正在准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
