@@ -49,6 +49,7 @@
   let autoSpeechEnabled = localStorage.getItem(autoSpeechKey) !== "0";
   let currentAudio = null;
   let currentAudioUrl = "";
+  let xiaoWuAudioPlayer = null;
   let pendingPlayback = null;
   let xiaoWuVoiceSpeed = Number(localStorage.getItem(speechSpeedKey)) || 1;
   const speechSpeedOptions = [0.8, 1, 1.2, 1.5, 2, 2.5, 3];
@@ -63,6 +64,8 @@
   let isChatTimeSyncing = false;
   let lastChatTimeSyncAt = 0;
   let historyAutoSyncTimerId = null;
+  let voiceRestartCount = 0;
+  const maxVoiceRestarts = 3;
 
   function readRecords() {
     try {
@@ -499,13 +502,26 @@
       currentAudio.pause();
       currentAudio.currentTime = 0;
       currentAudio.src = "";
-      currentAudio = null;
     }
     if (currentAudioUrl) {
       URL.revokeObjectURL(currentAudioUrl);
       currentAudioUrl = "";
     }
     if (activeSpeechEngine === "azure") activeSpeechEngine = "";
+  }
+
+  function getXiaoWuAudioPlayer() {
+    if (!xiaoWuAudioPlayer) {
+      xiaoWuAudioPlayer = new Audio();
+      xiaoWuAudioPlayer.preload = "auto";
+      xiaoWuAudioPlayer.playsInline = true;
+    }
+    currentAudio = xiaoWuAudioPlayer;
+    return xiaoWuAudioPlayer;
+  }
+
+  function primeXiaoWuAudioPlayer() {
+    getXiaoWuAudioPlayer();
   }
 
   function speakWithBrowserVoice(text, onEnd, options = {}) {
@@ -575,8 +591,9 @@
 
       const audioBlob = await response.blob();
       currentAudioUrl = URL.createObjectURL(audioBlob);
-      currentAudio = new Audio(currentAudioUrl);
-      currentAudio.preload = "auto";
+      currentAudio = getXiaoWuAudioPlayer();
+      currentAudio.src = currentAudioUrl;
+      currentAudio.load();
       currentAudio.volume = 1;
       currentAudio.playbackRate = xiaoWuVoiceSpeed;
       currentAudio.onended = () => {
@@ -609,6 +626,7 @@
           text,
           audioUrl: currentAudioUrl
         };
+        activeSpeechEngine = "";
         currentlySpeakingId = "";
         setXiaoWuVoiceStatus("");
         renderHistory();
@@ -679,6 +697,7 @@
 
   function openChat() {
     isOpen = true;
+    primeXiaoWuAudioPlayer();
     pageScrollBeforeChat = window.scrollY || document.documentElement.scrollTop || 0;
     document.body.classList.add("xiaowu-chat-open");
     document.body.style.top = `-${pageScrollBeforeChat}px`;
@@ -766,11 +785,16 @@
   }
 
   async function toggleVoiceInput() {
+    primeXiaoWuAudioPlayer();
     if (voiceInputActive || isListening) {
       stopVoiceInput();
       return;
     }
-    const isInterruptingSpeech = Boolean(currentlySpeakingId || currentAudio || ("speechSynthesis" in window && window.speechSynthesis.speaking));
+    const isInterruptingSpeech = Boolean(
+      currentlySpeakingId
+      || activeSpeechEngine === "azure"
+      || ("speechSynthesis" in window && window.speechSynthesis.speaking)
+    );
     if (isInterruptingSpeech) {
       stopXiaoWuSpeech();
       await startVoiceInput({ autoSend: true });
@@ -800,6 +824,7 @@
 
     const sessionId = Date.now();
     voiceSessionId = sessionId;
+    voiceRestartCount = 0;
     voiceInputActive = true;
     voiceAutoSend = Boolean(options.autoSend);
     startRecognitionSession(Recognition, sessionId, listeningMessage, permissionState);
@@ -812,7 +837,7 @@
     recognition = activeRecognition;
     activeRecognition.lang = getSpeechLanguage();
     activeRecognition.interimResults = true;
-    activeRecognition.continuous = false;
+    activeRecognition.continuous = true;
     activeRecognition.maxAlternatives = 1;
 
     const originalValue = input?.value || "";
@@ -856,12 +881,20 @@
 
     activeRecognition.onerror = (event) => {
       if (voiceSessionId !== sessionId) return;
-      console.error(debugPrefix, "speech recognition failed", event);
+      console.error(debugPrefix, "speech recognition failed", {
+        error: event.error,
+        message: event.message || "",
+        event
+      });
+      if (event.error === "aborted") {
+        voiceErrorMessage = "";
+        return;
+      }
       const errorMessages = {
         "audio-capture": "🌸 小7，没有找到麦克风。可以检查一下浏览器麦克风权限。",
         "not-allowed": "🌸 小7，请到浏览器设置开启麦克风权限。",
         "service-not-allowed": "🌸 小7，浏览器暂时不允许语音输入，可以先打字问小吴老师。",
-        "no-speech": "🌸 小7，这次没有听到声音，小吴还在继续听。",
+        "no-speech": "🌸 小7，这次没有听到声音，可以再点一次麦克风继续说。",
         "network": "🌸 小7，语音识别网络有点卡，可以再试一次。"
       };
       voiceErrorMessage = errorMessages[event.error] || "🌸 小7，刚才没有听清楚。可以再点一次麦克风，慢慢说。";
@@ -869,6 +902,9 @@
       const fatalErrors = ["audio-capture", "not-allowed", "service-not-allowed"];
       if (fatalErrors.includes(event.error)) {
         resetVoiceInputState({ keepNotice: true, sessionId });
+      }
+      if (event.error === "no-speech") {
+        voiceInputActive = false;
       }
     };
 
@@ -880,6 +916,19 @@
 
       if (sessionFinalTranscript.trim()) {
         clearChatNotice(listeningMessage);
+      }
+
+      if (voiceInputActive && voiceRestartCount < maxVoiceRestarts) {
+        voiceRestartCount += 1;
+        console.log(debugPrefix, "speech recognition ended early, restarting", {
+          restart: voiceRestartCount,
+          max: maxVoiceRestarts
+        });
+        window.setTimeout(() => {
+          if (voiceSessionId !== sessionId || !voiceInputActive) return;
+          startRecognitionSession(Recognition, sessionId, listeningMessage, permissionState);
+        }, 120);
+        return;
       }
 
       resetVoiceInputState({ keepNotice: Boolean(voiceErrorMessage) || !hadResult, sessionId });
@@ -981,6 +1030,7 @@
   async function handleSubmit(event) {
     event.preventDefault();
     if (isSending) return;
+    primeXiaoWuAudioPlayer();
 
     const input = document.querySelector("#xiaowuChatInput");
     stopVoiceInput({ forceAbort: true, silent: true });
@@ -1316,8 +1366,10 @@
     }
     currentlySpeakingId = record.id;
     currentAudioUrl = pendingPlayback.audioUrl;
-    if (!currentAudio || currentAudio.src !== currentAudioUrl) {
-      currentAudio = new Audio(currentAudioUrl);
+    currentAudio = getXiaoWuAudioPlayer();
+    if (currentAudio.src !== currentAudioUrl) {
+      currentAudio.src = currentAudioUrl;
+      currentAudio.load();
     }
     currentAudio.volume = 1;
     currentAudio.playbackRate = xiaoWuVoiceSpeed;
