@@ -70,7 +70,8 @@ const lessonSequence = [
   { lessonId: "lesson-017", title: "印紙税，哪些文书要贴印纸？", status: "ready" },
   { lessonId: "lesson-018", title: "所得税，不要算税，只抓特例", status: "ready" },
   { lessonId: "lesson-019", title: "地価公示法，流程记住就能拿分", status: "ready" },
-  { lessonId: "lesson-020", title: "小吴正在准备中", status: "pending" }
+  { lessonId: "lesson-020", title: "不動産取得税，别背数字，先判断取得", status: "ready" },
+  { lessonId: "lesson-021", title: "小吴正在准备中", status: "pending" }
 ];
 
 const lessonChapterLabels = {
