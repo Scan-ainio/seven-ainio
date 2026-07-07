@@ -4,6 +4,7 @@
   const collapsedKey = "takken_xiaowu_teacher_collapsed_v1";
   const autoSpeechKey = "takken_xiaowu_teacher_auto_speech_v1";
   const speechSpeedKey = "takken_xiaowu_teacher_speech_speed_v1";
+  const microphonePermissionKey = "takken_xiaowu_microphone_allowed_v1";
   const chatTodayTimeKey = "takken_today_xiaowu_chat_seconds_v1";
   const chatTotalTimeKey = "takken_total_xiaowu_chat_seconds_v1";
   const chatTimeDateKey = "takken_today_xiaowu_chat_date_v1";
@@ -57,6 +58,7 @@
   let activeSpeechEngine = "";
   let activeBrowserSpeechText = "";
   let activeBrowserSpeechRecordId = "";
+  let speechPlaybackToken = 0;
   let pageScrollBeforeChat = 0;
   let chatTimerId = null;
   let chatLastTick = null;
@@ -470,13 +472,15 @@
   }
 
   async function getMicrophonePermissionState() {
-    if (!navigator.permissions?.query) return "unknown";
+    const cachedPermission = localStorage.getItem(microphonePermissionKey);
+    if (!navigator.permissions?.query) return cachedPermission === "1" ? "granted" : "unknown";
     try {
       const result = await navigator.permissions.query({ name: "microphone" });
+      if (result.state === "granted") localStorage.setItem(microphonePermissionKey, "1");
       return result.state || "unknown";
     } catch (error) {
       console.warn(debugPrefix, "microphone permission query unavailable", error);
-      return "unknown";
+      return cachedPermission === "1" ? "granted" : "unknown";
     }
   }
 
@@ -524,6 +528,110 @@
     getXiaoWuAudioPlayer();
   }
 
+  function splitTextForFastTts(text) {
+    const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+    if (!cleanText) return [];
+    const sentences = cleanText.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [cleanText];
+    const chunks = [];
+    let current = "";
+
+    sentences.forEach((sentence) => {
+      const limit = chunks.length === 0 ? 180 : 420;
+      const next = `${current}${current ? " " : ""}${sentence}`.trim();
+      if (next.length <= limit) {
+        current = next;
+        return;
+      }
+      if (current) chunks.push(current);
+      if (sentence.length <= limit) {
+        current = sentence.trim();
+        return;
+      }
+      for (let index = 0; index < sentence.length; index += limit) {
+        chunks.push(sentence.slice(index, index + limit).trim());
+      }
+      current = "";
+    });
+
+    if (current) chunks.push(current);
+    return chunks.filter(Boolean);
+  }
+
+  function playAzureAudioUrl(audioUrl, token) {
+    return new Promise((resolve, reject) => {
+      const audio = getXiaoWuAudioPlayer();
+      currentAudio = audio;
+      currentAudioUrl = audioUrl;
+      audio.src = audioUrl;
+      audio.load();
+      audio.volume = 1;
+      audio.playbackRate = xiaoWuVoiceSpeed;
+      audio.onended = () => {
+        if (token !== speechPlaybackToken) return;
+        resolve();
+      };
+      audio.onerror = () => {
+        if (token !== speechPlaybackToken) return;
+        reject(new Error("Azure audio playback failed"));
+      };
+      activeSpeechEngine = "azure";
+      setXiaoWuVoiceStatus("🔊 正在回答……");
+      audio.play().catch((error) => {
+        if (token !== speechPlaybackToken) return;
+        reject(error);
+      });
+    });
+  }
+
+  async function fetchAzureSpeechUrl(text) {
+    const response = await fetch(ttsEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        voice: xiaoWuVoiceName,
+        speed: xiaoWuVoiceSpeed
+      })
+    });
+
+    if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
+      throw new Error(`Azure Speech TTS failed with ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    return URL.createObjectURL(audioBlob);
+  }
+
+  async function playAzureSpeechChunks(chunks, token, options = {}, startIndex = 0, firstAudioUrl = "") {
+    for (let index = startIndex; index < chunks.length; index += 1) {
+      if (token !== speechPlaybackToken) return false;
+      const audioUrl = index === startIndex && firstAudioUrl ? firstAudioUrl : await fetchAzureSpeechUrl(chunks[index]);
+      try {
+        await playAzureAudioUrl(audioUrl, token);
+      } catch (playError) {
+        console.warn(debugPrefix, "Azure audio autoplay blocked", playError);
+        pendingPlayback = {
+          recordId: options.recordId || "",
+          text: chunks.join(" "),
+          audioUrl,
+          chunks,
+          nextIndex: index + 1
+        };
+        activeSpeechEngine = "";
+        currentlySpeakingId = "";
+        setXiaoWuVoiceStatus("");
+        renderHistory();
+        return false;
+      } finally {
+        if (token === speechPlaybackToken && audioUrl !== pendingPlayback?.audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+          if (currentAudioUrl === audioUrl) currentAudioUrl = "";
+        }
+      }
+    }
+    return true;
+  }
+
   function speakWithBrowserVoice(text, onEnd, options = {}) {
     if (!("speechSynthesis" in window)) {
       showChatNotice("🌸 小7，这个浏览器暂时不支持朗读，可以先看文字版的小吴老师。");
@@ -568,6 +676,7 @@
     }
 
     stopXiaoWuSpeech({ silent: true });
+    const token = ++speechPlaybackToken;
     if (options.recordId) currentlySpeakingId = options.recordId;
 
     if (xiaoWuTtsEngine === "browser") {
@@ -575,63 +684,17 @@
     }
 
     try {
-      const response = await fetch(ttsEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: speechText,
-          voice: xiaoWuVoiceName,
-          speed: xiaoWuVoiceSpeed
-        })
-      });
-
-      if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
-        throw new Error(`Azure Speech TTS failed with ${response.status}`);
-      }
-
-      const audioBlob = await response.blob();
-      currentAudioUrl = URL.createObjectURL(audioBlob);
-      currentAudio = getXiaoWuAudioPlayer();
-      currentAudio.src = currentAudioUrl;
-      currentAudio.load();
-      currentAudio.volume = 1;
-      currentAudio.playbackRate = xiaoWuVoiceSpeed;
-      currentAudio.onended = () => {
-        cleanupCurrentAudio();
-        pendingPlayback = null;
-        activeSpeechEngine = "";
-        setXiaoWuVoiceStatus("");
-        if (typeof onEnd === "function") onEnd();
-      };
-      currentAudio.onerror = () => {
-        cleanupCurrentAudio();
-        pendingPlayback = null;
-        activeSpeechEngine = "";
-        setXiaoWuVoiceStatus("");
-        if (typeof onEnd === "function") onEnd();
-      };
-
-      try {
-        activeSpeechEngine = "azure";
-        setXiaoWuVoiceStatus("🔊 正在回答……");
-        await currentAudio.play();
-        if (options.recordId) currentlySpeakingId = options.recordId;
-        pendingPlayback = null;
-        renderHistory();
-        return true;
-      } catch (playError) {
-        console.warn(debugPrefix, "Azure audio autoplay blocked", playError);
-        pendingPlayback = {
-          recordId: options.recordId || "",
-          text,
-          audioUrl: currentAudioUrl
-        };
-        activeSpeechEngine = "";
-        currentlySpeakingId = "";
-        setXiaoWuVoiceStatus("");
-        renderHistory();
-        return false;
-      }
+      const chunks = splitTextForFastTts(speechText);
+      setXiaoWuVoiceStatus("🔊 正在回答……");
+      const played = await playAzureSpeechChunks(chunks, token, options);
+      if (token !== speechPlaybackToken) return false;
+      cleanupCurrentAudio();
+      pendingPlayback = null;
+      activeSpeechEngine = "";
+      setXiaoWuVoiceStatus("");
+      if (typeof onEnd === "function") onEnd();
+      renderHistory();
+      return played;
     } catch (error) {
       console.warn(debugPrefix, "Azure Speech unavailable, falling back to SpeechSynthesis", error);
       cleanupCurrentAudio();
@@ -840,14 +903,43 @@
     activeRecognition.continuous = true;
     activeRecognition.maxAlternatives = 1;
 
-    const originalValue = input?.value || "";
-    let sessionFinalTranscript = "";
+    let baseText = input?.value || "";
+    let confirmedTranscript = "";
+    let interimTranscript = "";
+    let lastRenderedInputValue = baseText;
+    let highestSeenResultLength = 0;
+    let ignoreResultsBefore = 0;
+    let isApplyingRecognitionText = false;
+    const committedResultIndexes = new Set();
     let hadResult = false;
     let voiceErrorMessage = "";
+
+    const joinBaseAndVoiceText = (baseValue, voiceValue) => {
+      const base = String(baseValue || "");
+      const spoken = String(voiceValue || "").trim();
+      if (!spoken) return base;
+      return `${base}${base.trim() ? " " : ""}${spoken}`.trimStart();
+    };
+
+    const handleManualInput = () => {
+      if (isApplyingRecognitionText || voiceSessionId !== sessionId) return;
+      if (!input) return;
+      const currentValue = input.value || "";
+      if (currentValue === lastRenderedInputValue) return;
+      baseText = currentValue;
+      confirmedTranscript = "";
+      interimTranscript = "";
+      ignoreResultsBefore = highestSeenResultLength;
+      committedResultIndexes.clear();
+      lastRenderedInputValue = currentValue;
+    };
+
+    input?.addEventListener("input", handleManualInput);
 
     activeRecognition.onstart = () => {
       if (voiceSessionId !== sessionId) return;
       isListening = true;
+      localStorage.setItem(microphonePermissionKey, "1");
       if (voiceButton) {
         voiceButton.classList.add("listening");
         voiceButton.textContent = voiceAutoSend ? "🎙️ 插话中……" : "🎙️ 正在听小7说话……";
@@ -861,20 +953,28 @@
 
     activeRecognition.onresult = (event) => {
       if (voiceSessionId !== sessionId) return;
-      let interimTranscript = "";
+      highestSeenResultLength = Math.max(highestSeenResultLength, event.results.length);
+      interimTranscript = "";
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        if (index < ignoreResultsBefore) continue;
         const transcript = event.results[index][0]?.transcript || "";
         if (event.results[index].isFinal) {
-          sessionFinalTranscript += transcript;
+          if (!committedResultIndexes.has(index)) {
+            confirmedTranscript += transcript;
+            committedResultIndexes.add(index);
+          }
         } else {
           interimTranscript += transcript;
         }
       }
-      hadResult = Boolean((sessionFinalTranscript || interimTranscript).trim());
+      hadResult = Boolean((confirmedTranscript || interimTranscript).trim());
       if (input) {
-        const spokenText = `${sessionFinalTranscript}${interimTranscript}`.trim();
-        const nextText = `${originalValue}${originalValue && spokenText ? " " : ""}${spokenText}`.trimStart();
+        const spokenText = `${confirmedTranscript}${interimTranscript}`.trim();
+        const nextText = joinBaseAndVoiceText(baseText, spokenText);
+        isApplyingRecognitionText = true;
         input.value = nextText;
+        lastRenderedInputValue = nextText;
+        isApplyingRecognitionText = false;
       }
       if (voiceAutoSend && hadResult) scheduleVoiceAutoSend(sessionId);
     };
@@ -913,8 +1013,9 @@
       cleanupRecognitionHandlers(activeRecognition);
       recognition = null;
       isListening = false;
+      input?.removeEventListener("input", handleManualInput);
 
-      if (sessionFinalTranscript.trim()) {
+      if (confirmedTranscript.trim()) {
         clearChatNotice(listeningMessage);
       }
 
@@ -939,6 +1040,7 @@
       activeRecognition.start();
     } catch (error) {
       console.error(debugPrefix, "speech recognition start failed", error);
+      input?.removeEventListener("input", handleManualInput);
       showChatNotice(permissionState === "prompt"
         ? "🌸 小7，请允许浏览器使用麦克风后再试一次。"
         : "🌸 小7，这个浏览器暂时不支持语音输入，可以先打字问小吴老师。");
@@ -1364,32 +1466,18 @@
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+    const playback = pendingPlayback;
+    const chunks = playback.chunks?.length ? playback.chunks : splitTextForFastTts(stripForSpeech(record.answer));
+    const startIndex = Math.max(0, (playback.nextIndex || 1) - 1);
+    const token = ++speechPlaybackToken;
+    pendingPlayback = null;
     currentlySpeakingId = record.id;
-    currentAudioUrl = pendingPlayback.audioUrl;
-    currentAudio = getXiaoWuAudioPlayer();
-    if (currentAudio.src !== currentAudioUrl) {
-      currentAudio.src = currentAudioUrl;
-      currentAudio.load();
-    }
-    currentAudio.volume = 1;
-    currentAudio.playbackRate = xiaoWuVoiceSpeed;
-    currentAudio.onended = () => {
+    playAzureSpeechChunks(chunks, token, { recordId: record.id }, startIndex, playback.audioUrl).then((played) => {
+      if (token !== speechPlaybackToken) return;
       cleanupCurrentAudio();
-      pendingPlayback = null;
       activeSpeechEngine = "";
       currentlySpeakingId = "";
-      renderHistory();
-    };
-    currentAudio.onerror = () => {
-      cleanupCurrentAudio();
-      pendingPlayback = null;
-      activeSpeechEngine = "";
-      currentlySpeakingId = "";
-      renderHistory();
-    };
-    currentAudio.play().then(() => {
-      activeSpeechEngine = "azure";
-      pendingPlayback = null;
+      if (!played) return;
       renderHistory();
     }).catch((error) => {
       console.warn(debugPrefix, "manual Azure playback failed", error);
@@ -1402,6 +1490,7 @@
   }
 
   function stopXiaoWuSpeech(options = {}) {
+    speechPlaybackToken += 1;
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
