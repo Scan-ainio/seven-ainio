@@ -431,6 +431,20 @@ h2 {
   margin-top: 12px;
 }
 
+.course-actions .secondary-button.active,
+#favoriteCourseButton.active {
+  background: #fff1d9;
+  color: #7c4d13;
+  border-color: #e8c47f;
+}
+
+.course-practice-stat {
+  margin-top: 10px;
+  color: #4f6f56;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 .back-link,
 .link-button {
   display: inline-grid;

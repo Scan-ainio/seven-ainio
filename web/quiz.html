@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="manifest" href="site.webmanifest">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="quiz/quiz-style.css">
+    <link rel="stylesheet" href="quiz/quiz-style.css?v=20260709-classroom-v3">
   </head>
   <body>
     <main class="app-shell quiz-shell">
@@ -27,18 +27,30 @@
       </header>
 
       <section class="quiz-view" id="quizDirectoryView">
-        <section class="card quiz-directory-card">
-          <div class="section-heading">
-            <p class="eyebrow">Lessons</p>
-            <h2>📖 按课程练习</h2>
-          </div>
-          <div class="quiz-lesson-grid" id="lessonPracticeList"></div>
-        </section>
-
         <section class="quiz-directory-grid">
           <article class="card quiz-action-card">
+            <span>📖 按课程学习</span>
+            <p>Lesson001～Lesson100+，跟着小吴课堂顺序一课一课练。</p>
+            <button class="secondary-button" data-action="lessons">进入课程列表</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>🗂 按考试分类</span>
+            <p>宅建業法、権利関係、法令上の制限、税・その他，按考试板块练。</p>
+            <button class="secondary-button" data-action="categories">进入分类目录</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>🔎 按知识点练习</span>
+            <p>把同一个考点的题集中练，适合考前快速补弱点。</p>
+            <button class="secondary-button" data-action="topics">进入知识点目录</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>🔍 搜索题目</span>
+            <p>输入关键词，马上找到对应题目和课程。</p>
+            <button class="secondary-button" data-action="search">开始搜索</button>
+          </article>
+          <article class="card quiz-action-card" data-five-card="true">
             <span>🎯 五问免除专项</span>
-            <p>Lesson009～Lesson014，先练已经整理好的价格与鑑定评价题。</p>
+            <p>Lesson009～Lesson014，集中练建物、土地、广告、金融与价格。</p>
             <button class="secondary-button" data-action="special" data-special="five">开始专项</button>
           </article>
           <article class="card quiz-action-card">
@@ -47,9 +59,14 @@
             <button class="secondary-button" data-action="special" data-special="tax">开始专项</button>
           </article>
           <article class="card quiz-action-card">
-            <span>🧠 综合练习</span>
-            <p>从当前题库随机抽题，适合学完几课后做混合判断。</p>
-            <button class="secondary-button" data-action="mixed">开始综合练习</button>
+            <span>📝 历年真题</span>
+            <p>令和8～平成30，按正式考试顺序进入整套真题。</p>
+            <button class="secondary-button" data-action="past">查看年份</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>🧠 正式模拟考试</span>
+            <p>50题、120分钟、全部做完后一次评分。</p>
+            <button class="secondary-button" data-action="mock">进入正式模拟</button>
           </article>
           <article class="card quiz-action-card">
             <span>⭐ 我的错题</span>
@@ -62,10 +79,95 @@
             <button class="secondary-button" data-action="favorites">查看收藏</button>
           </article>
           <article class="card quiz-action-card">
-            <span>📊 学习统计</span>
-            <p>看看小7做了多少题、哪一课还需要小吴多陪一会儿。</p>
+            <span>📊 学习中心</span>
+            <p>统一查看学习时间、完成课程、错题、收藏和模拟成绩。</p>
             <button class="secondary-button" data-action="stats">查看统计</button>
           </article>
+          <article class="card quiz-action-card">
+            <span>⚙ 学习设置</span>
+            <p>设置是否具有五問免除资格，题库和模拟会自动调整。</p>
+            <button class="secondary-button" data-action="settings">打开设置</button>
+          </article>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizLessonListView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Lessons</p>
+            <h2>📖 按课程练习</h2>
+          </div>
+          <p class="quiz-soft-note">小7，选一课就好。今天不用贪多，做完再看解析。</p>
+          <div class="quiz-lesson-grid" id="lessonPracticeList"></div>
+          <button class="primary-button" id="backFromLessonsButton" type="button">返回题库首页</button>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizCategoryView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Exam Categories</p>
+            <h2>🗂 按考试分类</h2>
+          </div>
+          <p class="quiz-soft-note">小7，按考试科目刷题时，就从这里进入。</p>
+          <div class="quiz-lesson-grid" id="categoryPracticeList"></div>
+          <button class="primary-button" id="backFromCategoriesButton" type="button">返回题库首页</button>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizTopicView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Knowledge Points</p>
+            <h2>🔎 按知识点练习</h2>
+          </div>
+          <p class="quiz-soft-note">小7，哪里错得多，就把那个知识点单独拎出来练。</p>
+          <div class="quiz-lesson-grid" id="topicPracticeList"></div>
+          <button class="primary-button" id="backFromTopicsButton" type="button">返回题库首页</button>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizSearchView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Search</p>
+            <h2>🔍 搜索题目</h2>
+          </div>
+          <label class="quiz-search-box">
+            <span>关键词</span>
+            <input id="quizSearchInput" type="search" placeholder="例如：印紙税、保証協会、相殺">
+          </label>
+          <div class="quiz-list" id="quizSearchResults"></div>
+          <button class="primary-button" id="backFromSearchButton" type="button">返回题库首页</button>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizPastView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Past Questions</p>
+            <h2>📝 历年真题</h2>
+          </div>
+          <div class="quiz-lesson-grid" id="pastYearList"></div>
+          <button class="primary-button" id="backFromPastButton" type="button">返回题库首页</button>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizMockIntroView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Mock Exam</p>
+            <h2>🧠 正式模拟考试</h2>
+          </div>
+          <div class="quiz-rules">
+            <p><strong>考试规则：</strong>50题 / 120分钟 / 四选一。</p>
+            <p>考试过程中不显示答案，交卷后一次评分，并自动把错题放进错题本。</p>
+            <p id="mockExemptionNote">如果开启五問免除资格，系统会自动去掉五問免除题。</p>
+          </div>
+          <div class="quiz-result-actions">
+            <button class="primary-button" id="startMockExamButton" type="button">开始正式模拟考试</button>
+            <button class="secondary-button" id="backFromMockIntroButton" type="button">返回题库首页</button>
+          </div>
         </section>
       </section>
 
@@ -79,15 +181,26 @@
             <span id="quizQuestionCounter">第 1 / 1 题</span>
             <span id="quizLessonBadge">Lesson</span>
           </div>
+          <div class="quiz-progress-row hidden" id="mockExamStatus">
+            <span id="mockTimeLeft">剩余时间 120:00</span>
+            <span id="mockAnsweredCount">已答 0 / 50</span>
+          </div>
           <h2 id="quizQuestionTitle">题目加载中</h2>
           <p class="quiz-related" id="quizRelatedSection"></p>
+          <p class="quiz-source" id="quizQuestionSource">【小吴强化题】</p>
           <div class="quiz-choice-list" id="quizChoiceList"></div>
           <div class="quiz-question-actions">
             <button class="secondary-button" id="favoriteQuestionButton" type="button">❤️ 收藏</button>
           </div>
+          <div class="quiz-exam-actions hidden" id="mockExamActions">
+            <button class="secondary-button" id="previousQuizQuestionButton" type="button">上一题</button>
+            <button class="secondary-button" id="mockNextQuestionButton" type="button">下一题</button>
+            <button class="primary-button" id="submitMockButton" type="button">交卷</button>
+          </div>
           <article class="quiz-answer-panel hidden" id="quizAnswerPanel">
             <strong id="quizAnswerResult"></strong>
             <p id="quizExplanationText"></p>
+            <div class="quiz-similar-block" id="quizSimilarBlock"></div>
             <div class="quiz-answer-actions">
               <a class="secondary-button link-button" id="returnLessonButton" href="course.html">📖 回到对应 Lesson</a>
               <button class="primary-button" id="nextQuizQuestionButton" type="button">下一题</button>
@@ -105,8 +218,10 @@
             <article><span>正确数</span><strong id="resultCorrect">0</strong></article>
             <article><span>正确率</span><strong id="resultRate">0%</strong></article>
             <article><span>错题数</span><strong id="resultMistakes">0</strong></article>
+            <article><span>预计合格线</span><strong id="resultPassLine">--</strong></article>
           </div>
           <p id="resultMessage" class="quiz-soft-note"></p>
+          <div class="quiz-stats-notes hidden" id="mockScoreBreakdown"></div>
           <div class="quiz-result-actions">
             <button class="secondary-button" id="retryQuizButton" type="button">再练一次</button>
             <button class="secondary-button" id="viewMistakesButton" type="button">查看错题</button>
@@ -134,13 +249,20 @@
         <section class="card quiz-stats-card">
           <div class="section-heading">
             <p class="eyebrow">Stats</p>
-            <h2>📊 学习统计</h2>
+            <h2>📊 学习中心</h2>
           </div>
           <div class="quiz-result-grid">
+            <article><span>今日学习时间</span><strong id="statsTodayStudy">0分00秒</strong></article>
+            <article><span>累计学习时间</span><strong id="statsTotalStudy">0分00秒</strong></article>
+            <article><span>连续学习</span><strong id="statsStreak">0天</strong></article>
+            <article><span>学习天数</span><strong id="statsStudyDays">0天</strong></article>
+            <article><span>完成课程</span><strong id="statsCompletedCourses">0</strong></article>
+            <article><span>今日做题数</span><strong id="statsTodayAnswered">0</strong></article>
             <article><span>总完成题数</span><strong id="statsTotalAnswered">0</strong></article>
             <article><span>总正确率</span><strong id="statsTotalRate">0%</strong></article>
             <article><span>错题数</span><strong id="statsMistakes">0</strong></article>
             <article><span>收藏题数</span><strong id="statsFavorites">0</strong></article>
+            <article><span>模拟考试</span><strong id="statsMockCount">0次</strong></article>
           </div>
           <div class="quiz-stats-notes">
             <p><strong>最弱章节：</strong><span id="statsWeakest">暂无</span></p>
@@ -152,10 +274,30 @@
           <button class="primary-button" id="backFromStatsButton" type="button">返回题库目录</button>
         </section>
       </section>
+
+      <section class="quiz-view hidden" id="quizSettingsView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Learning Settings</p>
+            <h2>⚙ 学习设置</h2>
+          </div>
+          <p class="quiz-soft-note">是否具有五問免除资格？设置后，题库、模拟考试和学习中心会自动调整。</p>
+          <div class="quiz-settings-box">
+            <label><input type="radio" name="fiveExemption" value="no"> 否，按完整50题学习</label>
+            <label><input type="radio" name="fiveExemption" value="yes"> 是，隐藏五問免除并从模拟中去掉</label>
+          </div>
+          <div class="quiz-result-actions">
+            <button class="primary-button" id="saveSettingsButton" type="button">保存设置</button>
+            <button class="secondary-button" id="backFromSettingsButton" type="button">返回题库首页</button>
+          </div>
+        </section>
+      </section>
     </main>
 
-    <script src="quiz/quiz-bank.js?v=20260709-quiz-v2"></script>
-    <script src="quiz/quiz-page.js?v=20260709-quiz-v2"></script>
+    <script src="learning-storage.js?v=20260709-classroom-v3"></script>
+    <script src="quiz/past-exam-index.js?v=20260709-quiz-v3"></script>
+    <script src="quiz/quiz-bank.js?v=20260709-classroom-v3"></script>
+    <script src="quiz/quiz-page.js?v=20260709-classroom-v3"></script>
     <script src="xiaowu-chat.js?v=20260707-voice-v3"></script>
   </body>
 </html>

@@ -24,6 +24,8 @@ const courseExamTrap = document.querySelector("#courseExamTrap");
 const courseKeywords = document.querySelector("#courseKeywords");
 const coursePracticeText = document.querySelector("#coursePracticeText");
 const lessonQuizLink = document.querySelector("#lessonQuizLink");
+const favoriteCourseButton = document.querySelector("#favoriteCourseButton");
+const lessonAccuracyBadge = document.querySelector("#lessonAccuracyBadge");
 const courseSummary = document.querySelector("#courseSummary");
 const courseReward = document.querySelector("#courseReward");
 const lessonFinishPanel = document.querySelector("#lessonFinishPanel");
@@ -191,10 +193,19 @@ function saveStudyDelta() {
     ensureStudyDate();
     const today = todayKey();
     const dailyStudyLog = readStorageObject(dailyStudyLogKey);
-    writeNumberStorage(todayStudyKey, readNumberStorage(todayStudyKey) + deltaSeconds);
-    writeNumberStorage(totalStudyKey, readNumberStorage(totalStudyKey) + deltaSeconds);
     dailyStudyLog[today] = (Number(dailyStudyLog[today]) || 0) + deltaSeconds;
     localStorage.setItem(dailyStudyLogKey, JSON.stringify(dailyStudyLog));
+    if (window.XiaoWuLearningStorage?.updateLearningData) {
+      window.XiaoWuLearningStorage.updateLearningData((data) => {
+        data.studyTime.todaySeconds = (Number(data.studyTime.todaySeconds) || 0) + deltaSeconds;
+        data.studyTime.totalSeconds = (Number(data.studyTime.totalSeconds) || 0) + deltaSeconds;
+        data.studyTime.days = Array.from(new Set([...(data.studyTime.days || []), today]));
+        return data;
+      });
+    } else {
+      writeNumberStorage(todayStudyKey, readNumberStorage(todayStudyKey) + deltaSeconds);
+      writeNumberStorage(totalStudyKey, readNumberStorage(totalStudyKey) + deltaSeconds);
+    }
     lastStudyTick += deltaSeconds * 1000;
   }
 }
@@ -251,6 +262,48 @@ function getLessonFavorites(lessonId) {
 
 function saveLessonFavorites(lessonId, favorites) {
   writeStorage(lessonStorageKey(lessonId, "favorites"), favorites);
+}
+
+function getLearningData() {
+  return window.XiaoWuLearningStorage?.loadLearningData?.() || null;
+}
+
+function updateLearningData(mutator) {
+  return window.XiaoWuLearningStorage?.updateLearningData?.(mutator);
+}
+
+function getCourseFavorites() {
+  return getLearningData()?.courses?.favorites || [];
+}
+
+function renderCourseFavoriteButton() {
+  if (!favoriteCourseButton || !currentLessonId) return;
+  const active = getCourseFavorites().includes(currentLessonId);
+  favoriteCourseButton.textContent = active ? "⭐ 已收藏课程" : "⭐ 收藏课程";
+  favoriteCourseButton.classList.toggle("active", active);
+}
+
+function toggleCourseFavorite() {
+  if (!currentLessonId) return;
+  updateLearningData((data) => {
+    const favorites = new Set(data.courses.favorites || []);
+    if (favorites.has(currentLessonId)) favorites.delete(currentLessonId);
+    else favorites.add(currentLessonId);
+    data.courses.favorites = Array.from(favorites);
+    return data;
+  });
+  renderCourseFavoriteButton();
+}
+
+function renderLessonAccuracy() {
+  if (!lessonAccuracyBadge || !currentLessonId) return;
+  const lessonStats = getLearningData()?.quiz?.stats?.lessons?.[currentLessonId];
+  if (!lessonStats?.answered) {
+    lessonAccuracyBadge.textContent = "📈 本课正确率：还没练习";
+    return;
+  }
+  const rate = Math.round((lessonStats.correct / lessonStats.answered) * 100);
+  lessonAccuracyBadge.textContent = `📈 本课正确率：${rate}%（已做 ${lessonStats.answered} 题）`;
 }
 
 function getLessonMemoryState(lessonId) {
@@ -637,6 +690,8 @@ function renderLesson() {
     lessonQuizLink.href = `quiz.html?lesson=${encodeURIComponent(lesson.lessonId)}`;
     lessonQuizLink.textContent = `📝 ${lessonDisplayLabel(lesson.lessonId)} 本课练习`;
   }
+  renderCourseFavoriteButton();
+  renderLessonAccuracy();
   courseSummary.textContent = lesson.summary || "";
   lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：课堂章节 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
   lessonFinishPanel.querySelector("span").textContent = `🎉 ${lessonLabel} 完成！`;
@@ -658,6 +713,10 @@ function continueLastPosition() {
 
 function completeLesson() {
   window.xiaoWuCourseEngine.completeLesson(currentLessonId);
+  updateLearningData((data) => {
+    data.courses.completed = Array.from(new Set([...(data.courses.completed || []), currentLessonId]));
+    return data;
+  });
   renderLesson();
 }
 
@@ -715,6 +774,7 @@ window.addEventListener("beforeunload", stopStudyTimer);
 courseStartButton.addEventListener("click", continueLastPosition);
 courseCompleteButton.addEventListener("click", completeLesson);
 lessonFinishButton.addEventListener("click", completeLesson);
+favoriteCourseButton?.addEventListener("click", toggleCourseFavorite);
 courseCatalogToggle?.addEventListener("click", () => {
   courseCatalogPanel?.classList.toggle("hidden");
 });
