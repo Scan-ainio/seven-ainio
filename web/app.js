@@ -765,9 +765,7 @@ function startTodayLesson() {
   startStudyTimer();
 
   if (todayLesson.isCompleted) {
-    setQuestionSource("original");
-    startQuiz();
-    document.querySelector("#quizCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.location.href = "quiz.html";
     return;
   }
 

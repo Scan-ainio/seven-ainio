@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>小吴题库 - Takken Scan Coach</title>
+    <meta name="theme-color" content="#4f7f63">
+    <meta name="apple-mobile-web-app-title" content="小吴宅建">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="quiz/quiz-style.css">
+  </head>
+  <body>
+    <main class="app-shell quiz-shell">
+      <header class="hero quiz-hero">
+        <div class="lesson-top-actions">
+          <a class="back-link" href="index.html">← 返回首页</a>
+          <a class="back-link" href="course.html?id=lesson-013">📚 小吴课堂</a>
+        </div>
+        <p class="eyebrow">XiaoWu Quiz</p>
+        <h1>📚 小吴题库</h1>
+        <p class="subtitle">小7，今天不用刷很多。把做错的地方认真看懂，分数就会慢慢长出来。</p>
+      </header>
+
+      <section class="quiz-view" id="quizDirectoryView">
+        <section class="card quiz-directory-card">
+          <div class="section-heading">
+            <p class="eyebrow">Lessons</p>
+            <h2>📖 按课程练习</h2>
+          </div>
+          <div class="quiz-lesson-grid" id="lessonPracticeList"></div>
+        </section>
+
+        <section class="quiz-directory-grid">
+          <article class="card quiz-action-card">
+            <span>🎯 五问免除专项</span>
+            <p>Lesson009～Lesson014，先练已经整理好的价格与鑑定评价题。</p>
+            <button class="secondary-button" data-action="special" data-special="five">开始专项</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>💰 税法专项</span>
+            <p>Lesson015～Lesson020，集中练贈与税、登録免許税、印紙税、所得税和取得税。</p>
+            <button class="secondary-button" data-action="special" data-special="tax">开始专项</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>🧠 综合练习</span>
+            <p>从当前题库随机抽题，适合学完几课后做混合判断。</p>
+            <button class="secondary-button" data-action="mixed">开始综合练习</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>⭐ 我的错题</span>
+            <p>小吴把小7错过的题都留在这里，方便以后再看。</p>
+            <button class="secondary-button" data-action="mistakes">查看错题</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>❤️ 我的收藏</span>
+            <p>把重要题收藏起来，以后复习就不用到处找。</p>
+            <button class="secondary-button" data-action="favorites">查看收藏</button>
+          </article>
+          <article class="card quiz-action-card">
+            <span>📊 学习统计</span>
+            <p>看看小7做了多少题、哪一课还需要小吴多陪一会儿。</p>
+            <button class="secondary-button" data-action="stats">查看统计</button>
+          </article>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizPracticeView">
+        <section class="card quiz-practice-card">
+          <div class="quiz-practice-top">
+            <button class="back-link quiz-back-button" id="backToQuizDirectory" type="button">← 返回题库目录</button>
+            <span id="practiceModeLabel">Lesson练习</span>
+          </div>
+          <div class="quiz-progress-row">
+            <span id="quizQuestionCounter">第 1 / 1 题</span>
+            <span id="quizLessonBadge">Lesson</span>
+          </div>
+          <h2 id="quizQuestionTitle">题目加载中</h2>
+          <p class="quiz-related" id="quizRelatedSection"></p>
+          <div class="quiz-choice-list" id="quizChoiceList"></div>
+          <div class="quiz-question-actions">
+            <button class="secondary-button" id="favoriteQuestionButton" type="button">❤️ 收藏</button>
+          </div>
+          <article class="quiz-answer-panel hidden" id="quizAnswerPanel">
+            <strong id="quizAnswerResult"></strong>
+            <p id="quizExplanationText"></p>
+            <div class="quiz-answer-actions">
+              <a class="secondary-button link-button" id="returnLessonButton" href="course.html">📖 回到对应 Lesson</a>
+              <button class="primary-button" id="nextQuizQuestionButton" type="button">下一题</button>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizResultView">
+        <section class="card quiz-result-card">
+          <p class="eyebrow">Result</p>
+          <h2>🌸 本次练习完成</h2>
+          <div class="quiz-result-grid">
+            <article><span>总题数</span><strong id="resultTotal">0</strong></article>
+            <article><span>正确数</span><strong id="resultCorrect">0</strong></article>
+            <article><span>正确率</span><strong id="resultRate">0%</strong></article>
+            <article><span>错题数</span><strong id="resultMistakes">0</strong></article>
+          </div>
+          <p id="resultMessage" class="quiz-soft-note"></p>
+          <div class="quiz-result-actions">
+            <button class="secondary-button" id="retryQuizButton" type="button">再练一次</button>
+            <button class="secondary-button" id="viewMistakesButton" type="button">查看错题</button>
+            <button class="primary-button" id="returnQuizHomeButton" type="button">返回题库目录</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizListView">
+        <section class="card quiz-list-card">
+          <div class="section-heading">
+            <p class="eyebrow" id="listEyebrow">Review</p>
+            <h2 id="listTitle">我的错题</h2>
+          </div>
+          <p class="quiz-soft-note" id="listNote"></p>
+          <div class="quiz-list" id="savedQuestionList"></div>
+          <div class="quiz-result-actions">
+            <button class="secondary-button" id="practiceSavedListButton" type="button">练习这些题</button>
+            <button class="primary-button" id="backFromListButton" type="button">返回题库目录</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="quiz-view hidden" id="quizStatsView">
+        <section class="card quiz-stats-card">
+          <div class="section-heading">
+            <p class="eyebrow">Stats</p>
+            <h2>📊 学习统计</h2>
+          </div>
+          <div class="quiz-result-grid">
+            <article><span>总完成题数</span><strong id="statsTotalAnswered">0</strong></article>
+            <article><span>总正确率</span><strong id="statsTotalRate">0%</strong></article>
+            <article><span>错题数</span><strong id="statsMistakes">0</strong></article>
+            <article><span>收藏题数</span><strong id="statsFavorites">0</strong></article>
+          </div>
+          <div class="quiz-stats-notes">
+            <p><strong>最弱章节：</strong><span id="statsWeakest">暂无</span></p>
+            <p><strong>推荐复习：</strong><span id="statsRecommendation">先做几题，小吴再帮小7判断。</span></p>
+            <p><strong>税法正确率：</strong><span id="statsTaxRate">0%</span></p>
+            <p><strong>五问免除正确率：</strong><span id="statsFiveRate">0%</span></p>
+            <p><strong>最近练习：</strong><span id="statsRecentAt">暂无</span></p>
+          </div>
+          <button class="primary-button" id="backFromStatsButton" type="button">返回题库目录</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="quiz/quiz-bank.js?v=20260709-quiz-v2"></script>
+    <script src="quiz/quiz-page.js?v=20260709-quiz-v2"></script>
+    <script src="xiaowu-chat.js?v=20260707-voice-v3"></script>
+  </body>
+</html>

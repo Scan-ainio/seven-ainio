@@ -23,6 +23,7 @@ const courseTodaySentence = document.querySelector("#courseTodaySentence");
 const courseExamTrap = document.querySelector("#courseExamTrap");
 const courseKeywords = document.querySelector("#courseKeywords");
 const coursePracticeText = document.querySelector("#coursePracticeText");
+const lessonQuizLink = document.querySelector("#lessonQuizLink");
 const courseSummary = document.querySelector("#courseSummary");
 const courseReward = document.querySelector("#courseReward");
 const lessonFinishPanel = document.querySelector("#lessonFinishPanel");
@@ -632,6 +633,10 @@ function renderLesson() {
     courseKeywords.appendChild(item);
   });
   coursePracticeText.textContent = lesson.afterLesson || "学完以后，先做原创题，再做官方过去问。";
+  if (lessonQuizLink) {
+    lessonQuizLink.href = `quiz.html?lesson=${encodeURIComponent(lesson.lessonId)}`;
+    lessonQuizLink.textContent = `📝 ${lessonDisplayLabel(lesson.lessonId)} 本课练习`;
+  }
   courseSummary.textContent = lesson.summary || "";
   lessonFinishStats.textContent = `今天学习：约 ${formatStudyTime(readNumberStorage(todayStudyKey))}。完成：课堂章节 ${story.length} 个。成长值：+${lesson.completionReward?.growthValue || 0}。`;
   lessonFinishPanel.querySelector("span").textContent = `🎉 ${lessonLabel} 完成！`;
